@@ -1,0 +1,17 @@
+﻿@page "/export"
+@inject StudentWifiMonitoring.Web.Data.AppDbContext Db
+
+<h3>Export Events (Alles)</h3>
+<button @onclick="ExportAll">Download CSV</button>
+<p>@message</p>
+
+@code {
+    private string? message;
+    private async Task ExportAll()
+    {
+        var csv = await StudentWifiMonitoring.Web.Services.CsvExporter.ExportAllAsync(Db);
+        var fileName = $"events-all-{DateTime.UtcNow:yyyyMMdd-HHmmss}.csv";
+        await File.WriteAllTextAsync(fileName, csv);
+        message = $"Export opgeslagen als {fileName}";
+    }
+}

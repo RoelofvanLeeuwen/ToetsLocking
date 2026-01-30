@@ -1,0 +1,40 @@
+﻿@page "/tests"
+@using StudentWifiMonitoring.Web.Data
+@using StudentWifiMonitoring.Web.Domain
+@inject AppDbContext Db
+
+<h3>Beheer Toetsen</h3>
+
+<input @bind="newName" placeholder="Toetsnaam" />
+<input type="datetime-local" @bind="startTimeLocal" />
+<input type="datetime-local" @bind="endTimeLocal" />
+<button @onclick="CreateTest">Aanmaken</button>
+
+<ul>
+    @foreach (var t in tests)
+    {
+        <li>@t.Name (@t.StartTime.ToLocalTime() - @t.EndTime.ToLocalTime()) @((t.IsActive ? "[Actief]" : ""))</li>
+    }
+</ul>
+
+@code {
+    private List<TestSession> tests = new();
+    private string newName = string.Empty;
+    private DateTime startTimeLocal = DateTime.Now;
+    private DateTime endTimeLocal = DateTime.Now.AddHours(2);
+
+    protected override void OnInitialized()
+    {
+        tests = Db.TestSessions.OrderByDescending(t => t.StartTime).ToList();
+    }
+
+    private async Task CreateTest()
+    {
+        var startUtc = DateTime.SpecifyKind(startTimeLocal, DateTimeKind.Local).ToUniversalTime();
+        var endUtc = DateTime.SpecifyKind(endTimeLocal, DateTimeKind.Local).ToUniversalTime();
+        var session = new TestSession { Name = newName, StartTime = startUtc, EndTime = endUtc };
+        Db.TestSessions.Add(session);
+        await Db.SaveChangesAsync();
+        tests.Insert(0, session);
+    }
+}

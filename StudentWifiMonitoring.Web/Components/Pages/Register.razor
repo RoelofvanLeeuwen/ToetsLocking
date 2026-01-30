@@ -1,0 +1,55 @@
+﻿@page "/register"
+@using StudentWifiMonitoring.Web.Data
+@using StudentWifiMonitoring.Web.Domain
+@inject AppDbContext Db
+@inject IHttpContextAccessor HttpContextAccessor
+@inject StudentWifiMonitoring.Web.Services.IMacResolver MacResolver
+
+<h3>Student Registratie</h3>
+
+@if (activeTest == null)
+{
+    <p>Er is momenteel geen toets actief.</p>
+}
+else
+{
+    <h4>Toets: @activeTest.Name (@activeTest.StartTime.ToLocalTime() - @activeTest.EndTime.ToLocalTime())</h4>
+    <input @bind="name" placeholder="Naam" />
+    <button @onclick="RegisterStudent">Registreer</button>
+    <p>@message</p>
+}
+
+@code {
+    private TestSession? activeTest;
+    private string name = string.Empty;
+    private string? message;
+
+    protected override void OnInitialized()
+    {
+        activeTest = Db.TestSessions
+            .FirstOrDefault(t => DateTime.UtcNow >= t.StartTime && DateTime.UtcNow <= t.EndTime);
+    }
+
+    private async Task RegisterStudent()
+    {
+        if (activeTest == null) { message = "Geen toets actief."; return; }
+
+        var ip = HttpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
+        var mac = ip != null ? MacResolver.GetMacForIp(ip) : null;
+        if (mac == null) { message = "Kon MAC niet bepalen."; return; }
+
+        var student = Db.Students.FirstOrDefault(s => s.MacAddress == mac);
+        if (student == null)
+        {
+            Db.Students.Add(new Student { Name = name.Trim(), TestName = activeTest.Name, MacAddress = mac });
+            message = "Geregistreerd";
+        }
+        else
+        {
+            student.Name = name.Trim();
+            student.TestName = activeTest.Name;
+            message = "Bijgewerkt";
+        }
+        await Db.SaveChangesAsync();
+    }
+}

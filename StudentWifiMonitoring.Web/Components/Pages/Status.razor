@@ -1,0 +1,69 @@
+﻿@page "/status"
+@using StudentWifiMonitoring.Web.Data
+@using StudentWifiMonitoring.Web.Domain
+@inject AppDbContext Db
+
+<h3>Connected Students</h3>
+
+@if (connected == null)
+{
+    <p>Loading…</p>
+}
+else
+{
+    <ul>
+        @foreach (var s in connected)
+        {
+            <li>@s.Name (@s.MacAddress)</li>
+        }
+    </ul>
+}
+
+@code {
+    private List<Student>? connected;
+    private PeriodicTimer? timer;
+    private CancellationTokenSource? cts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshAsync();
+
+        cts = new CancellationTokenSource();
+        timer = new PeriodicTimer(TimeSpan.FromSeconds(3));
+        _ = PollAsync(cts.Token);
+    }
+
+    private Task RefreshAsync()
+    {
+        connected = Db.Connections
+            .Where(c => c.DisconnectedAt == null && c.Student != null)
+            .Select(c => c.Student!)
+            .Distinct()
+            .ToList();
+
+        return Task.CompletedTask;
+    }
+
+    private async Task PollAsync(CancellationToken token)
+    {
+        try
+        {
+            while (await timer!.WaitForNextTickAsync(token))
+            {
+                await RefreshAsync();
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            cts?.Cancel();
+            timer?.Dispose();
+        }
+        catch { }
+    }
+}

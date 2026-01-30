@@ -1,0 +1,37 @@
+﻿@page "/export-by-test"
+@using Microsoft.EntityFrameworkCore
+@using StudentWifiMonitoring.Web.Data
+@using StudentWifiMonitoring.Web.Domain
+@inject AppDbContext Db
+
+<h3>Export per Toets</h3>
+
+<select @bind-Value="selectedTestId" @bind-Value:event="onchange">
+    <option value="">-- Kies toets --</option>
+    @foreach (var t in tests)
+    {
+        <option value="@t.Id">@t.Name (@t.StartTime.ToLocalTime() - @t.EndTime.ToLocalTime())</option>
+    }
+</select>
+<button @onclick="Export">Download CSV</button>
+<p>@message</p>
+
+@code {
+    private List<TestSession> tests = new();
+    private int? selectedTestId;
+    private string? message;
+
+    protected override void OnInitialized()
+    {
+        tests = Db.TestSessions.OrderByDescending(t => t.StartTime).ToList();
+    }
+
+    private async Task Export()
+    {
+        if (selectedTestId == null) { message = "Geen toets geselecteerd."; return; }
+        var csv = await StudentWifiMonitoring.Web.Services.CsvExporter.ExportByTestAsync(Db, selectedTestId.Value);
+        var fileName = $"events-test-{selectedTestId}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.csv";
+        await File.WriteAllTextAsync(fileName, csv);
+        message = $"Export opgeslagen als {fileName}";
+    }
+}

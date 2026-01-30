@@ -1,0 +1,92 @@
+﻿@page "/myscreen"
+@using StudentWifiMonitoring.Web.Data
+@using StudentWifiMonitoring.Web.Domain
+@inject AppDbContext Db
+@inject IHttpContextAccessor HttpContextAccessor
+@inject StudentWifiMonitoring.Web.Services.IMacResolver MacResolver
+
+@if (!registered)
+{
+    <div style="background-color:red; color:white; height:100vh; display:flex; align-items:center; justify-content:center; font-size:3rem;">
+        NIET GEREGISTREERD / NIET VERBONDEN
+    </div>
+}
+else if (isOnline)
+{
+    <div style="background-color:green; color:white; height:100vh; display:flex; align-items:center; justify-content:center; font-size:3rem;">
+        VERBONDEN — @studentName (@testName)
+    </div>
+}
+else
+{
+    <div style="background-color:red; color:white; height:100vh; display:flex; align-items:center; justify-content:center; font-size:3rem;">
+        GEEN VERBINDING — @studentName (@testName)
+    </div>
+}
+
+@code {
+    private string studentName = "";
+    private string testName = "";
+    private bool registered = false;
+    private bool isOnline = false;
+    private string? mac;
+
+    private PeriodicTimer? timer;
+    private CancellationTokenSource? cts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var ip = HttpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
+        mac = ip != null ? MacResolver.GetMacForIp(ip) : null;
+
+        if (mac != null)
+        {
+            var student = Db.Students.FirstOrDefault(s => s.MacAddress == mac);
+            if (student != null)
+            {
+                registered = true;
+                studentName = student.Name;
+                testName = student.TestName;
+
+                // initial check
+                isOnline = Db.Connections.Any(c => c.DisconnectedAt == null && c.Student != null && c.Student.MacAddress == mac);
+
+                // start background polling
+                cts = new CancellationTokenSource();
+                timer = new PeriodicTimer(TimeSpan.FromSeconds(2)); // adjust interval as needed
+                _ = PollStatusAsync(cts.Token);
+            }
+        }
+    }
+
+    private async Task PollStatusAsync(CancellationToken token)
+    {
+        try
+        {
+            // run until cancelled
+            while (await timer!.WaitForNextTickAsync(token))
+            {
+                var online = Db.Connections.Any(c => c.DisconnectedAt == null && c.Student != null && c.Student.MacAddress == mac);
+                if (online != isOnline)
+                {
+                    isOnline = online;
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // expected on dispose
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            cts?.Cancel();
+            timer?.Dispose();
+        }
+        catch { }
+    }
+}
