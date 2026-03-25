@@ -1,20 +1,15 @@
 ﻿@page "/"
-
-<PageTitle>Home</PageTitle>
-
-<h1>Hello, world!</h1>
-
-Welcome to your new app.
-@* @page "/"
 @using Microsoft.AspNetCore.SignalR.Client
-@using StudentWifiMonitoring.Web.Data
 @using StudentWifiMonitoring.Web.Domain
-@inject AppDbContext Db
+@using StudentWifiMonitoring.Web.Services
+@inject DashboardService DashboardService
 @inject NavigationManager Nav
+
+<PageTitle>Docent Dashboard</PageTitle>
 
 <h3>Docent Dashboard</h3>
 
-<select @bind-Value="selectedTestId" @bind-Value:event="onchange">
+<select @bind="selectedTestId" @bind:after="OnTestChanged">
     <option value="">-- Kies toets --</option>
     @foreach (var t in tests)
     {
@@ -54,8 +49,8 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        tests = Db.TestSessions.OrderByDescending(t => t.StartTime).ToList();
-        await LoadStudents();
+        tests = DashboardService.GetTestSessions();
+        LoadStudents();
 
         hubConnection = new HubConnectionBuilder()
             .WithUrl(Nav.ToAbsoluteUri("/hubs/status"))
@@ -76,32 +71,13 @@ else
         await hubConnection.StartAsync();
     }
 
-    private Task LoadStudents()
+    private void LoadStudents()
     {
-        if (selectedTestId.HasValue)
-        {
-            var test = Db.TestSessions.Find(selectedTestId.Value);
-            if (test != null)
-            {
-                students = Db.Students.Where(s => s.TestName == test.Name).ToList();
-                onlineMacs = Db.Connections
-                    .Where(c => c.DisconnectedAt == null && c.Student!.TestName == test.Name)
-                    .Select(c => c.Student!.MacAddress)
-                    .ToHashSet();
-            }
-        }
-        else
-        {
-            students = Db.Students.ToList();
-            onlineMacs = Db.Connections.Where(c => c.DisconnectedAt == null).Select(c => c.Student!.MacAddress).ToHashSet();
-        }
-        return Task.CompletedTask;
+        (students, onlineMacs) = DashboardService.GetStudentsWithStatus(selectedTestId);
     }
 
-    private async Task OnTestChanged(ChangeEventArgs e)
+    private void OnTestChanged()
     {
-        if (int.TryParse(Convert.ToString(e.Value), out var id)) selectedTestId = id; else selectedTestId = null;
-        await LoadStudents();
-        StateHasChanged();
+        LoadStudents();
     }
-} *@
+}

@@ -1,14 +1,17 @@
-﻿namespace StudentWifiMonitoring.Web.Services
+﻿namespace StudentWifiMonitoring.Web.Services;
+
+/// <summary>
+/// Mock-implementatie van IStationProvider voor lokale ontwikkeling op Windows.
+/// Retourneert een vaste lijst van test MAC-adressen.
+/// </summary>
+public class MockStationProvider : IStationProvider
 {
-    public class MockStationProvider : IStationProvider
+    public Task<IReadOnlyCollection<Station>> GetStationsAsync()
     {
-        public Task<IReadOnlyCollection<Station>> GetStationsAsync()
+        return Task.FromResult<IReadOnlyCollection<Station>>(new List<Station>
         {
-            return Task.FromResult<IReadOnlyCollection<Station>>(new List<Station>
-            {
-                new("aa:bb:cc:dd:ee:01"),
-                new("aa:bb:cc:dd:ee:02")
-            });
-        }
+            new("aa:bb:cc:dd:ee:01"),
+            new("aa:bb:cc:dd:ee:02")
+        });
     }
 }
