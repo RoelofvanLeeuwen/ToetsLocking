@@ -1,55 +1,186 @@
 ﻿@page "/register"
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
 @using StudentWifiMonitoring.Web.Data
 @using StudentWifiMonitoring.Web.Domain
-@inject AppDbContext Db
+@using StudentWifiMonitoring.Web.Services
+@inject AppDbContext DbContext
 @inject IHttpContextAccessor HttpContextAccessor
-@inject StudentWifiMonitoring.Web.Services.IMacResolver MacResolver
+@inject IMacResolver MacResolver
+@inject ILogger<Register> Logger
 
-<h3>Student Registratie</h3>
+<PageTitle>Registreren</PageTitle>
 
-@if (activeTest == null)
-{
-    <p>Er is momenteel geen toets actief.</p>
-}
-else
-{
-    <h4>Toets: @activeTest.Name (@activeTest.StartTime.ToLocalTime() - @activeTest.EndTime.ToLocalTime())</h4>
-    <input @bind="name" placeholder="Naam" />
-    <button @onclick="RegisterStudent">Registreer</button>
-    <p>@message</p>
-}
+<div class="container mt-4">
+    <h2>Student Registratie</h2>
+
+    @if (_activeSession == null)
+    {
+        <div class="alert alert-warning mt-3">
+            <strong>Geen actieve toets</strong>
+            <p class="mb-0">Er is momenteel geen toets actief. Registratie is alleen mogelijk tijdens een actieve toets.</p>
+        </div>
+    }
+    else
+    {
+        <div class="card mt-3">
+            <div class="card-body">
+                <h5 class="card-title">Toets: @_activeSession.Name</h5>
+                <p class="text-muted">Looptijd: @_activeSession.StartTime.ToLocalTime().ToString("dd-MM-yyyy HH:mm") - @_activeSession.EndTime.ToLocalTime().ToString("dd-MM-yyyy HH:mm")</p>
+
+                <div class="mb-3">
+                    <label for="studentName" class="form-label">Naam:</label>
+                    <input type="text" 
+                           class="form-control" 
+                           id="studentName" 
+                           @bind="_studentName" 
+                           placeholder="Voer je naam in"
+                           disabled="@_isProcessing" />
+                </div>
+
+                <button class="btn btn-primary" 
+                        @onclick="RegisterAsync" 
+                        disabled="@(_isProcessing || string.IsNullOrWhiteSpace(_studentName))">
+                    @if (_isProcessing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        <span>Bezig met registreren...</span>
+                    }
+                    else
+                    {
+                        <span>Registreren</span>
+                    }
+                </button>
+
+                @if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <div class="alert alert-danger mt-3">
+                        <strong>Fout</strong>
+                        <p class="mb-0">@_errorMessage</p>
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(_successMessage))
+                {
+                    <div class="alert alert-success mt-3">
+                        <strong>Gelukt!</strong>
+                        <p class="mb-0">@_successMessage</p>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
 
 @code {
-    private TestSession? activeTest;
-    private string name = string.Empty;
-    private string? message;
+    private TestSession? _activeSession;
+    private string _studentName = string.Empty;
+    private string _errorMessage = string.Empty;
+    private string _successMessage = string.Empty;
+    private bool _isProcessing = false;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        activeTest = Db.TestSessions
-            .FirstOrDefault(t => DateTime.UtcNow >= t.StartTime && DateTime.UtcNow <= t.EndTime);
+        await LoadActiveSessionAsync();
     }
 
-    private async Task RegisterStudent()
+    /// <summary>
+    /// Laadt de huidige actieve toetssessie.
+    /// </summary>
+    private async Task LoadActiveSessionAsync()
     {
-        if (activeTest == null) { message = "Geen toets actief."; return; }
+        var now = DateTime.UtcNow;
+        _activeSession = await DbContext.TestSessions
+            .Where(ts => ts.StartTime <= now && ts.EndTime >= now)
+            .OrderBy(ts => ts.StartTime)
+            .FirstOrDefaultAsync();
+    }
 
-        var ip = HttpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
-        var mac = ip != null ? MacResolver.GetMacForIp(ip) : null;
-        if (mac == null) { message = "Kon MAC niet bepalen."; return; }
+    /// <summary>
+    /// Registreert de student voor de actieve toets.
+    /// Bepaalt automatisch het MAC-adres op basis van het client IP-adres.
+    /// </summary>
+    private async Task RegisterAsync()
+    {
+        _errorMessage = string.Empty;
+        _successMessage = string.Empty;
+        _isProcessing = true;
 
-        var student = Db.Students.FirstOrDefault(s => s.MacAddress == mac);
-        if (student == null)
+        try
         {
-            Db.Students.Add(new Student { Name = name.Trim(), TestName = activeTest.Name, MacAddress = mac });
-            message = "Geregistreerd";
+            // Valideer naam
+            if (string.IsNullOrWhiteSpace(_studentName))
+            {
+                _errorMessage = "Voer een geldige naam in.";
+                return;
+            }
+
+            // Controleer opnieuw of er een actieve sessie is
+            if (_activeSession == null)
+            {
+                _errorMessage = "Er is geen actieve toets meer. Probeer de pagina te vernieuwen.";
+                return;
+            }
+
+            // Bepaal client IP-adres
+            var httpContext = HttpContextAccessor.HttpContext;
+            if (httpContext?.Connection?.RemoteIpAddress == null)
+            {
+                Logger.LogWarning("Kan client IP-adres niet bepalen tijdens registratie");
+                _errorMessage = "Kan je IP-adres niet bepalen. Neem contact op met de docent.";
+                return;
+            }
+
+            var clientIp = httpContext.Connection.RemoteIpAddress.ToString();
+
+            // Bepaal MAC-adres via resolver
+            var macAddress = MacResolver.GetMacForIp(clientIp);
+            if (string.IsNullOrEmpty(macAddress))
+            {
+                Logger.LogWarning("Kan MAC-adres niet bepalen voor IP {ClientIp}", clientIp);
+                _errorMessage = "Kan je apparaat niet identificeren. Zorg dat je verbonden bent met het juiste WiFi-netwerk.";
+                return;
+            }
+
+            // Zoek of update bestaande student
+            var existingStudent = await DbContext.Students
+                .FirstOrDefaultAsync(s => s.MacAddress == macAddress);
+
+            if (existingStudent == null)
+            {
+                // Nieuwe student toevoegen
+                var newStudent = new Student
+                {
+                    Name = _studentName.Trim(),
+                    TestName = _activeSession.Name,
+                    MacAddress = macAddress
+                };
+                DbContext.Students.Add(newStudent);
+                Logger.LogInformation("Nieuwe student geregistreerd: {StudentName} voor toets {TestName}", 
+                    newStudent.Name, _activeSession.Name);
+            }
+            else
+            {
+                // Bestaande student updaten
+                existingStudent.Name = _studentName.Trim();
+                existingStudent.TestName = _activeSession.Name;
+                Logger.LogInformation("Bestaande student bijgewerkt: {StudentName} voor toets {TestName}", 
+                    existingStudent.Name, _activeSession.Name);
+            }
+
+            await DbContext.SaveChangesAsync();
+
+            _successMessage = $"Je bent succesvol geregistreerd voor '{_activeSession.Name}'. Je apparaat wordt nu gemonitord.";
+            _studentName = string.Empty;
         }
-        else
+        catch (Exception ex)
         {
-            student.Name = name.Trim();
-            student.TestName = activeTest.Name;
-            message = "Bijgewerkt";
+            Logger.LogError(ex, "Onverwachte fout tijdens registratie van student");
+            _errorMessage = "Er is een onverwachte fout opgetreden. Probeer het opnieuw of neem contact op met de docent.";
         }
-        await Db.SaveChangesAsync();
+        finally
+        {
+            _isProcessing = false;
+        }
     }
 }

@@ -22,6 +22,7 @@ public class Program
         builder.Services.AddScoped<DashboardService>();
         
         builder.Services.AddSignalR();
+        builder.Services.AddHostedService<MonitoringService>();
         
 #if WINDOWS
                     builder.Services.AddSingleton<IStationProvider, MockStationProvider>();
