@@ -63,9 +63,12 @@ public class MonitoringService : BackgroundService
         using var scope = _serviceProvider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
+        var now = DateTime.UtcNow;
+
         // Controleer of er een actieve toets is
         var activeSession = await context.TestSessions
-            .Where(ts => ts.StartTime <= DateTime.UtcNow && ts.EndTime >= DateTime.UtcNow)
+            .Where(ts => ts.StartTime <= now && ts.EndTime >= now)
+            .OrderBy(ts => ts.StartTime)
             .FirstOrDefaultAsync(cancellationToken);
 
         if (activeSession == null)

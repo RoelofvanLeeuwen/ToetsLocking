@@ -11,8 +11,8 @@ using StudentWifiMonitoring.Web.Data;
 namespace StudentWifiMonitoring.Web.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20251002091636_initial")]
-    partial class initial
+    [Migration("20260326073124_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

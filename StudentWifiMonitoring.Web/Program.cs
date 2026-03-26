@@ -25,11 +25,35 @@ public class Program
         builder.Services.AddHostedService<MonitoringService>();
         
 #if WINDOWS
-                    builder.Services.AddSingleton<IStationProvider, MockStationProvider>();
-                    builder.Services.AddSingleton<IMacResolver, WindowsMacResolver>();
+        builder.Services.AddSingleton<IStationProvider, MockStationProvider>();
+        
+        // Registreer de echte resolver
+        builder.Services.AddSingleton<WindowsMacResolver>();
+        
+        // Wrap met development decorator
+        builder.Services.AddSingleton<IMacResolver>(sp =>
+        {
+            var innerResolver = sp.GetRequiredService<WindowsMacResolver>();
+            var environment = sp.GetRequiredService<IWebHostEnvironment>();
+            var configuration = sp.GetRequiredService<IConfiguration>();
+            var logger = sp.GetRequiredService<ILogger<DevelopmentMacResolverDecorator>>();
+            return new DevelopmentMacResolverDecorator(innerResolver, environment, configuration, logger);
+        });
 #else
         builder.Services.AddSingleton<IStationProvider, LinuxIwStationProvider>();
-        builder.Services.AddSingleton<IMacResolver, LinuxMacResolver>();
+        
+        // Registreer de echte resolver
+        builder.Services.AddSingleton<LinuxMacResolver>();
+        
+        // Wrap met development decorator
+        builder.Services.AddSingleton<IMacResolver>(sp =>
+        {
+            var innerResolver = sp.GetRequiredService<LinuxMacResolver>();
+            var environment = sp.GetRequiredService<IWebHostEnvironment>();
+            var configuration = sp.GetRequiredService<IConfiguration>();
+            var logger = sp.GetRequiredService<ILogger<DevelopmentMacResolverDecorator>>();
+            return new DevelopmentMacResolverDecorator(innerResolver, environment, configuration, logger);
+        });
 #endif
 
         var app = builder.Build();

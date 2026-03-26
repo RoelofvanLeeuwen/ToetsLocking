@@ -1,40 +1,164 @@
 ﻿@page "/tests"
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
 @using StudentWifiMonitoring.Web.Data
 @using StudentWifiMonitoring.Web.Domain
 @inject AppDbContext Db
+@inject ILogger<Tests> Logger
 
-<h3>Beheer Toetsen</h3>
+<PageTitle>Beheer Toetsen</PageTitle>
 
-<input @bind="newName" placeholder="Toetsnaam" />
-<input type="datetime-local" @bind="startTimeLocal" />
-<input type="datetime-local" @bind="endTimeLocal" />
-<button @onclick="CreateTest">Aanmaken</button>
+<div class="container mt-4">
+    <h3>Beheer Toetsen</h3>
 
-<ul>
-    @foreach (var t in tests)
-    {
-        <li>@t.Name (@t.StartTime.ToLocalTime() - @t.EndTime.ToLocalTime()) @((t.IsActive ? "[Actief]" : ""))</li>
-    }
-</ul>
+    <div class="card mt-3">
+        <div class="card-body">
+            <h5 class="card-title">Nieuwe Toets Aanmaken</h5>
+            
+            <div class="mb-3">
+                <label for="testName" class="form-label">Toetsnaam:</label>
+                <input type="text" 
+                       class="form-control" 
+                       id="testName" 
+                       @bind="newName" 
+                       placeholder="Voer toetsnaam in" />
+            </div>
+
+            <div class="mb-3">
+                <label for="startTime" class="form-label">Starttijd (lokale tijd):</label>
+                <input type="datetime-local" 
+                       class="form-control" 
+                       id="startTime" 
+                       @bind="startTimeLocal" />
+            </div>
+
+            <div class="mb-3">
+                <label for="endTime" class="form-label">Eindtijd (lokale tijd):</label>
+                <input type="datetime-local" 
+                       class="form-control" 
+                       id="endTime" 
+                       @bind="endTimeLocal" />
+            </div>
+
+            <button class="btn btn-primary" @onclick="CreateTest">Toets Aanmaken</button>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger mt-3">
+                    @errorMessage
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(successMessage))
+            {
+                <div class="alert alert-success mt-3">
+                    @successMessage
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-body">
+            <h5 class="card-title">Bestaande Toetsen</h5>
+            
+            @if (tests.Count == 0)
+            {
+                <p class="text-muted">Nog geen toetsen aangemaakt.</p>
+            }
+            else
+            {
+                <ul class="list-group">
+                    @foreach (var t in tests)
+                    {
+                        <li class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>@t.Name</strong>
+                                    <br />
+                                    <small class="text-muted">
+                                        @t.StartTime.ToLocalTime().ToString("dd-MM-yyyy HH:mm") - @t.EndTime.ToLocalTime().ToString("dd-MM-yyyy HH:mm")
+                                    </small>
+                                </div>
+                                @if (t.IsActive)
+                                {
+                                    <span class="badge bg-success">Actief</span>
+                                }
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    </div>
+</div>
 
 @code {
     private List<TestSession> tests = new();
     private string newName = string.Empty;
     private DateTime startTimeLocal = DateTime.Now;
     private DateTime endTimeLocal = DateTime.Now.AddHours(2);
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        tests = Db.TestSessions.OrderByDescending(t => t.StartTime).ToList();
+        await LoadTestsAsync();
+    }
+
+    private async Task LoadTestsAsync()
+    {
+        tests = await Db.TestSessions.OrderByDescending(t => t.StartTime).ToListAsync();
     }
 
     private async Task CreateTest()
     {
-        var startUtc = DateTime.SpecifyKind(startTimeLocal, DateTimeKind.Local).ToUniversalTime();
-        var endUtc = DateTime.SpecifyKind(endTimeLocal, DateTimeKind.Local).ToUniversalTime();
-        var session = new TestSession { Name = newName, StartTime = startUtc, EndTime = endUtc };
-        Db.TestSessions.Add(session);
-        await Db.SaveChangesAsync();
-        tests.Insert(0, session);
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+
+        try
+        {
+            if (string.IsNullOrWhiteSpace(newName))
+            {
+                errorMessage = "Voer een toetsnaam in.";
+                return;
+            }
+
+            if (endTimeLocal <= startTimeLocal)
+            {
+                errorMessage = "Eindtijd moet na de starttijd liggen.";
+                return;
+            }
+
+            // Converteer expliciete lokale tijd naar UTC
+            // datetime-local geeft unspecified DateTime, dus eerst als Local markeren
+            var startUtc = DateTime.SpecifyKind(startTimeLocal, DateTimeKind.Local).ToUniversalTime();
+            var endUtc = DateTime.SpecifyKind(endTimeLocal, DateTimeKind.Local).ToUniversalTime();
+
+            var session = new TestSession 
+            { 
+                Name = newName.Trim(), 
+                StartTime = startUtc, 
+                EndTime = endUtc 
+            };
+
+            Db.TestSessions.Add(session);
+            await Db.SaveChangesAsync();
+            
+            await LoadTestsAsync();
+            
+            successMessage = $"Toets '{session.Name}' succesvol aangemaakt.";
+            newName = string.Empty;
+            startTimeLocal = DateTime.Now;
+            endTimeLocal = DateTime.Now.AddHours(2);
+
+            Logger.LogInformation("Toets aangemaakt: {TestName} ({StartTime} - {EndTime})", 
+                session.Name, session.StartTime, session.EndTime);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Fout bij het aanmaken van toets");
+            errorMessage = "Er is een fout opgetreden bij het aanmaken van de toets.";
+        }
     }
 }
