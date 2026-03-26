@@ -1,0 +1,445 @@
+@page "/dev/stations"
+@using StudentWifiMonitoring.Web.Services
+@using StudentWifiMonitoring.Web.Data
+@using StudentWifiMonitoring.Web.Domain
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+@inject IStationProvider StationProvider
+@inject IWebHostEnvironment Environment
+@inject AppDbContext DbContext
+
+<PageTitle>Development: Mock Stations</PageTitle>
+
+<div class="container mt-4">
+    @if (!Environment.IsDevelopment())
+    {
+        <div class="alert alert-danger">
+            <h4>⚠️ Productie Omgeving</h4>
+            <p>Deze pagina is alleen beschikbaar in development mode.</p>
+        </div>
+        return;
+    }
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h3>🧪 Development: Mock WiFi Stations</h3>
+                    <small class="text-muted">Test de monitoring flow zonder echte WiFi-clients</small>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <strong>Acceptatietest flow:</strong><br/>
+                        DevStations → Student Database → MockStationProvider → MonitoringService → SignalR → Dashboard
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(_message))
+                    {
+                        <div class="alert @(_isError ? "alert-danger" : "alert-success") alert-dismissible fade show">
+                            @_message
+                            <button type="button" class="btn-close" @onclick="() => _message = null"></button>
+                        </div>
+                    }
+
+                    <div class="mb-4">
+                        <h5>Mock Station Toevoegen</h5>
+                        <div class="input-group">
+                            <input type="text" 
+                                   class="form-control" 
+                                   @bind="_newMacAddress" 
+                                   placeholder="aa:bb:cc:dd:ee:03"
+                                   @onkeypress="HandleKeyPress"
+                                   maxlength="17" />
+                            <button class="btn btn-success" @onclick="AddStationAsync" disabled="@_isLoading">
+                                @if (_isLoading)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                }
+                                ➕ Toevoegen
+                            </button>
+                        </div>
+                        <small class="text-muted">Formaat: xx:xx:xx:xx:xx:xx (lowercase)</small>
+                    </div>
+
+                    <div>
+                        <h5>Huidige Mock Stations (@_stations.Count)</h5>
+                        @if (_stations.Count == 0)
+                        {
+                            <p class="text-muted">Geen mock stations verbonden.</p>
+                        }
+                        else
+                        {
+                            <div class="list-group">
+                                @foreach (var station in _stations.OrderBy(s => s.MacAddress))
+                                {
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <span class="badge bg-secondary me-2">MAC</span>
+                                            <code>@station.MacAddress</code>
+                                        </div>
+                                        <button class="btn btn-sm btn-danger" 
+                                                @onclick="() => RemoveStationAsync(station.MacAddress)"
+                                                disabled="@_isLoading">
+                                            ❌ Verwijderen
+                                        </button>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    @if (_stations.Count > 0)
+                    {
+                        <div class="mt-3">
+                            <button class="btn btn-warning" @onclick="ClearStationsAsync" disabled="@_isLoading">
+                                🗑️ Alles Verwijderen
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5>ℹ️ Hoe te gebruiken</h5>
+                </div>
+                <div class="card-body">
+                    <h6 class="text-primary">Handmatig:</h6>
+                    <ol class="small">
+                        <li>Zorg dat een <strong>actieve test</strong> bestaat (via /tests)</li>
+                        <li>Voeg een mock MAC-adres toe</li>
+                        <li>MonitoringService detecteert de "connectie"</li>
+                        <li>Controleer het <strong>dashboard</strong> voor realtime updates</li>
+                        <li>Verwijder het MAC-adres om "disconnectie" te simuleren</li>
+                    </ol>
+                    <hr />
+                    <h6 class="text-success">Snelle test (aanbevolen):</h6>
+                    <ol class="small">
+                        <li>Zorg dat een <strong>actieve test</strong> bestaat (via /tests)</li>
+                        <li>Klik op een snelle testknop hieronder →</li>
+                        <li>Student wordt automatisch aangemaakt/bijgewerkt</li>
+                        <li>Mock station wordt online gezet</li>
+                        <li>Dashboard toont realtime updates</li>
+                    </ol>
+                    <hr />
+                    <p class="small text-muted mb-0">
+                        <strong>Tip:</strong> Open het dashboard in een apart tabblad om SignalR updates live te zien.
+                    </p>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header bg-success text-white">
+                    <h5>🚀 Snelle Test Studenten</h5>
+                </div>
+                <div class="card-body">
+                    @if (_activeTestSession != null)
+                    {
+                        <div class="alert alert-success alert-sm mb-3">
+                            <small>
+                                <strong>Actieve toets:</strong><br/>
+                                @_activeTestSession.Name
+                            </small>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-warning alert-sm mb-3">
+                            <small>
+                                <strong>⚠️ Geen actieve toets</strong><br/>
+                                Maak eerst een toets aan via /tests
+                            </small>
+                        </div>
+                    }
+                    
+                    <p class="small text-muted mb-2">
+                        Klik op een knop om automatisch:
+                    </p>
+                    <ul class="small text-muted mb-3">
+                        <li>Student in database aan te maken</li>
+                        <li>Mock station online te zetten</li>
+                    </ul>
+                    
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-sm btn-success" 
+                                @onclick='() => QuickTestStudentAsync("Test Student A", "aa:bb:cc:dd:ee:10")'
+                                disabled="@(_isLoading || _activeTestSession == null)">
+                            👤 Test Student A
+                        </button>
+                        <button class="btn btn-sm btn-success" 
+                                @onclick='() => QuickTestStudentAsync("Test Student B", "aa:bb:cc:dd:ee:11")'
+                                disabled="@(_isLoading || _activeTestSession == null)">
+                            👤 Test Student B
+                        </button>
+                        <button class="btn btn-sm btn-success" 
+                                @onclick='() => QuickTestStudentAsync("Test Student C", "aa:bb:cc:dd:ee:12")'
+                                disabled="@(_isLoading || _activeTestSession == null)">
+                            👤 Test Student C
+                        </button>
+                        <button class="btn btn-sm btn-success" 
+                                @onclick='() => QuickTestStudentAsync("Test Student D", "aa:bb:cc:dd:ee:13")'
+                                disabled="@(_isLoading || _activeTestSession == null)">
+                            👤 Test Student D
+                        </button>
+                    </div>
+                    
+                    @if (_activeTestSession == null)
+                    {
+                        <div class="mt-2">
+                            <a href="/tests" class="btn btn-sm btn-outline-primary w-100">
+                                ➕ Maak eerst een toets aan
+                            </a>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<Station> _stations = new();
+    private string? _newMacAddress;
+    private string? _message;
+    private bool _isError;
+    private bool _isLoading;
+    private TestSession? _activeTestSession;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStationsAsync();
+        await LoadActiveTestSessionAsync();
+    }
+
+    /// <summary>
+    /// Laadt de actieve testsessie uit de database.
+    /// </summary>
+    private async Task LoadActiveTestSessionAsync()
+    {
+        var now = DateTime.UtcNow;
+        _activeTestSession = await DbContext.TestSessions
+            .Where(t => t.StartTime <= now && now <= t.EndTime)
+            .OrderBy(t => t.StartTime)
+            .FirstOrDefaultAsync();
+    }
+
+    /// <summary>
+    /// Laadt de huidige lijst van mock stations.
+    /// </summary>
+    private async Task LoadStationsAsync()
+    {
+        var stations = await StationProvider.GetStationsAsync();
+        _stations = stations.ToList();
+    }
+
+    /// <summary>
+    /// Voegt een nieuw mock station toe.
+    /// </summary>
+    private async Task AddStationAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newMacAddress))
+        {
+            ShowError("Voer een MAC-adres in.");
+            return;
+        }
+
+        if (!IsValidMacAddress(_newMacAddress))
+        {
+            ShowError("Ongeldig MAC-adres formaat. Gebruik: xx:xx:xx:xx:xx:xx");
+            return;
+        }
+
+        _isLoading = true;
+        try
+        {
+            // Cast naar concrete type om Add methode te kunnen aanroepen
+            if (StationProvider is MockStationProvider mockProvider)
+            {
+                var added = mockProvider.AddStation(_newMacAddress);
+                
+                if (added)
+                {
+                    ShowSuccess($"Mock station {_newMacAddress} toegevoegd. MonitoringService detecteert deze bij volgende poll.");
+                    _newMacAddress = null;
+                    await LoadStationsAsync();
+                }
+                else
+                {
+                    ShowError($"MAC-adres {_newMacAddress} bestaat al.");
+                }
+            }
+            else
+            {
+                ShowError("MockStationProvider niet beschikbaar. Draait applicatie in development mode?");
+            }
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// Verwijdert een mock station.
+    /// </summary>
+    private async Task RemoveStationAsync(string macAddress)
+    {
+        _isLoading = true;
+        try
+        {
+            if (StationProvider is MockStationProvider mockProvider)
+            {
+                var removed = mockProvider.RemoveStation(macAddress);
+                
+                if (removed)
+                {
+                    ShowSuccess($"Mock station {macAddress} verwijderd. MonitoringService detecteert disconnectie bij volgende poll.");
+                    await LoadStationsAsync();
+                }
+                else
+                {
+                    ShowError($"MAC-adres {macAddress} niet gevonden.");
+                }
+            }
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// Verwijdert alle mock stations.
+    /// </summary>
+    private async Task ClearStationsAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            if (StationProvider is MockStationProvider mockProvider)
+            {
+                mockProvider.ClearStations();
+                ShowSuccess("Alle mock stations verwijderd.");
+                await LoadStationsAsync();
+            }
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// Snelle toevoeging van een volledige teststudent.
+    /// Maakt student aan in database en zet mock station online.
+    /// </summary>
+    private async Task QuickTestStudentAsync(string studentName, string macAddress)
+    {
+        _isLoading = true;
+        try
+        {
+            // 1. Controleer of er een actieve toets is
+            await LoadActiveTestSessionAsync();
+            if (_activeTestSession == null)
+            {
+                ShowError("Geen actieve toets gevonden. Maak eerst een toets aan via /tests.");
+                return;
+            }
+
+            // 2. Controleer of MockStationProvider beschikbaar is
+            if (StationProvider is not MockStationProvider mockProvider)
+            {
+                ShowError("MockStationProvider niet beschikbaar. Draait applicatie op Windows in development mode?");
+                return;
+            }
+
+            // 3. Controleer MAC-adres formaat
+            if (!IsValidMacAddress(macAddress))
+            {
+                ShowError($"Ongeldig MAC-adres formaat: {macAddress}");
+                return;
+            }
+
+            // 4. Maak student aan of update bestaande
+            var existingStudent = await DbContext.Students
+                .FirstOrDefaultAsync(s => s.MacAddress == macAddress.ToLowerInvariant());
+
+            if (existingStudent != null)
+            {
+                // Update bestaande student
+                existingStudent.Name = studentName;
+                existingStudent.TestName = _activeTestSession.Name;
+            }
+            else
+            {
+                // Maak nieuwe student aan
+                var newStudent = new Student
+                {
+                    Name = studentName,
+                    MacAddress = macAddress.ToLowerInvariant(),
+                    TestName = _activeTestSession.Name
+                };
+                DbContext.Students.Add(newStudent);
+            }
+
+            await DbContext.SaveChangesAsync();
+
+            // 5. Voeg mock station toe
+            var stationAdded = mockProvider.AddStation(macAddress);
+            await LoadStationsAsync();
+
+            // 6. Toon succesbericht
+            var action = existingStudent != null ? "bijgewerkt" : "aangemaakt";
+            ShowSuccess($"✅ Student '{studentName}' {action} en mock station online gezet voor toets '{_activeTestSession.Name}'. MonitoringService detecteert connectie bij volgende poll.");
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Fout bij aanmaken teststudent: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// Valideert basis MAC-adres formaat.
+    /// </summary>
+    private bool IsValidMacAddress(string mac)
+    {
+        if (string.IsNullOrWhiteSpace(mac))
+            return false;
+
+        // Simpele check: 17 tekens, met colons op juiste posities
+        if (mac.Length != 17)
+            return false;
+
+        var parts = mac.Split(':');
+        if (parts.Length != 6)
+            return false;
+
+        return parts.All(p => p.Length == 2 && p.All(c => char.IsDigit(c) || (c >= 'a' && c <= 'f')));
+    }
+
+    private void HandleKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            _ = AddStationAsync();
+        }
+    }
+
+    private void ShowSuccess(string message)
+    {
+        _message = message;
+        _isError = false;
+    }
+
+    private void ShowError(string message)
+    {
+        _message = message;
+        _isError = true;
+    }
+}

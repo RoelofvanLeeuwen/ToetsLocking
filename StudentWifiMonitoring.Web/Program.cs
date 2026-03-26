@@ -24,9 +24,23 @@ public class Program
         builder.Services.AddSignalR();
         builder.Services.AddHostedService<MonitoringService>();
         
-#if WINDOWS
-        builder.Services.AddSingleton<IStationProvider, MockStationProvider>();
+        // IStationProvider registratie - RUNTIME bepaald
+        if (OperatingSystem.IsWindows())
+        {
+            // Windows: gebruik MockStationProvider voor development testing
+            // Registreer als singleton instance zodat alle consumers dezelfde state delen
+            var mockProvider = new MockStationProvider();
+            builder.Services.AddSingleton<IStationProvider>(mockProvider);
+            builder.Services.AddSingleton(mockProvider); // Ook als concrete type voor DevStations.razor
+        }
+        else
+        {
+            // Linux/Raspberry Pi: gebruik echte WiFi station provider
+            builder.Services.AddSingleton<IStationProvider, LinuxIwStationProvider>();
+        }
         
+        // IMacResolver registratie - compile-time bepaald (blijft #if)
+#if WINDOWS
         // Registreer de echte resolver
         builder.Services.AddSingleton<WindowsMacResolver>();
         
@@ -40,8 +54,6 @@ public class Program
             return new DevelopmentMacResolverDecorator(innerResolver, environment, configuration, logger);
         });
 #else
-        builder.Services.AddSingleton<IStationProvider, LinuxIwStationProvider>();
-        
         // Registreer de echte resolver
         builder.Services.AddSingleton<LinuxMacResolver>();
         

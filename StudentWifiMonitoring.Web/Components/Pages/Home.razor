@@ -2,43 +2,111 @@
 @using Microsoft.AspNetCore.SignalR.Client
 @using StudentWifiMonitoring.Web.Domain
 @using StudentWifiMonitoring.Web.Services
+@rendermode InteractiveServer
 @inject DashboardService DashboardService
 @inject NavigationManager Nav
+@implements IAsyncDisposable
 
 <PageTitle>Docent Dashboard</PageTitle>
 
-<h3>Docent Dashboard</h3>
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h3>📊 Docent Dashboard</h3>
+            <small class="text-white-50">Realtime monitoring van verbonden studenten</small>
+        </div>
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label">Selecteer Toets:</label>
+                <select class="form-select" @bind="selectedTestId" @bind:after="OnTestChanged">
+                    <option value="">-- Alle toetsen --</option>
+                    @foreach (var t in tests)
+                    {
+                        <option value="@t.Id">@t.Name (@t.StartTime.ToLocalTime():HH:mm) - (@t.EndTime.ToLocalTime():HH:mm))</option>
+                    }
+                </select>
+            </div>
 
-<select @bind="selectedTestId" @bind:after="OnTestChanged">
-    <option value="">-- Kies toets --</option>
-    @foreach (var t in tests)
-    {
-        <option value="@t.Id">@t.Name (@t.StartTime.ToLocalTime() - @t.EndTime.ToLocalTime())</option>
-    }
-</select>
+            @if (_connectionStatus != null)
+            {
+                <div class="alert alert-info alert-sm mb-3">
+                    <small>
+                        <strong>SignalR Status:</strong> @_connectionStatus
+                        @if (_isConnected)
+                        {
+                            <span class="badge bg-success ms-2">🟢 Verbonden</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-danger ms-2">🔴 Niet verbonden</span>
+                        }
+                    </small>
+                </div>
+            }
 
-@if (students == null)
-{
-    <p>Laden...</p>
-}
-else
-{
-    <table>
-        <thead><tr><th>Naam</th><th>Toets</th><th>MAC</th><th>Status</th></tr></thead>
-        <tbody>
-        @foreach (var s in students)
-        {
-            var isOnline = onlineMacs.Contains(s.MacAddress);
-            <tr>
-                <td>@s.Name</td>
-                <td>@s.TestName</td>
-                <td>@s.MacAddress</td>
-                <td style="font-weight:bold; color:@(isOnline ? "green" : "red")">@(isOnline ? "connected" : "disconnected")</td>
-            </tr>
-        }
-        </tbody>
-    </table>
-}
+            @if (students == null)
+            {
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Laden...</span>
+                    </div>
+                    <p class="mt-2">Studenten laden...</p>
+                </div>
+            }
+            else if (students.Count == 0)
+            {
+                <div class="alert alert-warning">
+                    <strong>Geen studenten gevonden.</strong>
+                    <p class="mb-0">Er zijn nog geen studenten geregistreerd. Ga naar <a href="/register">/register</a> om studenten aan te melden.</p>
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Status</th>
+                                <th>Naam</th>
+                                <th>Toets</th>
+                                <th>MAC-adres</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var s in students.OrderBy(st => st.Name))
+                            {
+                                var isOnline = onlineMacs.Contains(s.MacAddress);
+                                <tr class="@(isOnline ? "table-success" : "")">
+                                    <td>
+                                        @if (isOnline)
+                                        {
+                                            <span class="badge bg-success">🟢 Verbonden</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">⚪ Niet verbonden</span>
+                                        }
+                                    </td>
+                                    <td><strong>@s.Name</strong></td>
+                                    <td>@s.TestName</td>
+                                    <td><code class="small">@s.MacAddress</code></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-3">
+                    <small class="text-muted">
+                        <strong>Totaal:</strong> @students.Count student(en) | 
+                        <strong class="text-success">Verbonden:</strong> @onlineMacs.Count | 
+                        <strong class="text-secondary">Niet verbonden:</strong> @(students.Count - onlineMacs.Count)
+                    </small>
+                </div>
+            }
+        </div>
+    </div>
+</div>
 
 @code {
     private List<Student>? students;
@@ -46,38 +114,173 @@ else
     private List<TestSession> tests = new();
     private int? selectedTestId;
     private HubConnection? hubConnection;
+    private string? _connectionStatus;
+    private bool _isConnected;
 
     protected override async Task OnInitializedAsync()
     {
+        // Laad initiële data
         tests = DashboardService.GetTestSessions();
         LoadStudents();
 
-        hubConnection = new HubConnectionBuilder()
-            .WithUrl(Nav.ToAbsoluteUri("/hubs/status"))
-            .WithAutomaticReconnect()
-            .Build();
-
-        hubConnection.On<object>("status", msg =>
-        {
-            var mac = msg.GetType().GetProperty("mac")?.GetValue(msg)?.ToString();
-            var status = msg.GetType().GetProperty("status")?.GetValue(msg)?.ToString();
-            if (mac != null && status != null)
-            {
-                if (status == "connected") onlineMacs.Add(mac); else onlineMacs.Remove(mac);
-                InvokeAsync(StateHasChanged);
-            }
-        });
-
-        await hubConnection.StartAsync();
+        // Setup SignalR verbinding
+        await SetupSignalRConnectionAsync();
     }
 
+    /// <summary>
+    /// Bouwt de SignalR HubConnection op en luistert naar status events.
+    /// </summary>
+    private async Task SetupSignalRConnectionAsync()
+    {
+        try
+        {
+            hubConnection = new HubConnectionBuilder()
+                .WithUrl(Nav.ToAbsoluteUri("/hubs/status"))
+                .WithAutomaticReconnect()
+                .Build();
+
+            // Luister naar status events van MonitoringService
+            hubConnection.On<StatusUpdatePayload>("status", async (payload) =>
+            {
+                await HandleStatusUpdateAsync(payload);
+            });
+
+            // Connection status tracking
+            hubConnection.Reconnecting += error =>
+            {
+                _connectionStatus = "Opnieuw verbinden...";
+                _isConnected = false;
+                InvokeAsync(StateHasChanged);
+                return Task.CompletedTask;
+            };
+
+            hubConnection.Reconnected += connectionId =>
+            {
+                _connectionStatus = "Opnieuw verbonden";
+                _isConnected = true;
+                LoadStudents(); // Reload data na reconnect
+                InvokeAsync(StateHasChanged);
+                return Task.CompletedTask;
+            };
+
+            hubConnection.Closed += error =>
+            {
+                _connectionStatus = "Verbinding verbroken";
+                _isConnected = false;
+                InvokeAsync(StateHasChanged);
+                return Task.CompletedTask;
+            };
+
+            // Start verbinding
+            await hubConnection.StartAsync();
+            _connectionStatus = "Verbonden met SignalR";
+            _isConnected = true;
+        }
+        catch (Exception ex)
+        {
+            _connectionStatus = $"Fout bij verbinden: {ex.Message}";
+            _isConnected = false;
+        }
+    }
+
+    /// <summary>
+    /// Verwerkt een realtime status update van MonitoringService via SignalR.
+    /// </summary>
+    private async Task HandleStatusUpdateAsync(StatusUpdatePayload payload)
+    {
+        try
+        {
+            // Valideer payload
+            if (string.IsNullOrEmpty(payload.Mac) || string.IsNullOrEmpty(payload.Status))
+            {
+                return;
+            }
+
+            // Update online status
+            if (payload.Status == "connected")
+            {
+                onlineMacs.Add(payload.Mac);
+            }
+            else if (payload.Status == "disconnected")
+            {
+                onlineMacs.Remove(payload.Mac);
+            }
+
+            // Controleer of student al bestaat in lijst
+            if (students != null)
+            {
+                var existingStudent = students.FirstOrDefault(s => s.MacAddress == payload.Mac);
+
+                if (existingStudent != null)
+                {
+                    // Update bestaande student als naam of toets gewijzigd is
+                    if (!string.IsNullOrEmpty(payload.Name) && existingStudent.Name != payload.Name)
+                    {
+                        existingStudent.Name = payload.Name;
+                    }
+                    if (!string.IsNullOrEmpty(payload.TestName) && existingStudent.TestName != payload.TestName)
+                    {
+                        existingStudent.TestName = payload.TestName;
+                    }
+                }
+                else if (!string.IsNullOrEmpty(payload.Name))
+                {
+                    // Voeg nieuwe student toe aan lijst
+                    var newStudent = new Student
+                    {
+                        MacAddress = payload.Mac,
+                        Name = payload.Name,
+                        TestName = payload.TestName ?? "Onbekend"
+                    };
+                    students.Add(newStudent);
+                }
+            }
+
+            // Trigger UI update op Blazor thread
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            // Log fout maar crash niet de UI
+            Console.WriteLine($"Fout bij verwerken status update: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Laadt studenten en hun online status uit de database.
+    /// </summary>
     private void LoadStudents()
     {
         (students, onlineMacs) = DashboardService.GetStudentsWithStatus(selectedTestId);
     }
 
+    /// <summary>
+    /// Handler voor toets selectie wijziging.
+    /// </summary>
     private void OnTestChanged()
     {
         LoadStudents();
+    }
+
+    /// <summary>
+    /// Cleanup SignalR verbinding bij dispose.
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+
+    /// <summary>
+    /// Payload structuur voor status updates van MonitoringService.
+    /// </summary>
+    private class StatusUpdatePayload
+    {
+        public string Mac { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public string? Name { get; set; }
+        public string? TestName { get; set; }
     }
 }
