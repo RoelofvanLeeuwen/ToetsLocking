@@ -20,7 +20,8 @@ public class Program
         builder.Services.AddHttpContextAccessor();
         
         builder.Services.AddScoped<DashboardService>();
-        
+        builder.Services.AddScoped<TestManagementService>();
+
         builder.Services.AddSignalR();
         builder.Services.AddHostedService<MonitoringService>();
         

@@ -3,11 +3,13 @@
 @using Microsoft.EntityFrameworkCore
 @using StudentWifiMonitoring.Web.Data
 @using StudentWifiMonitoring.Web.Domain
+@using StudentWifiMonitoring.Web.Services
 @using StudentWifiMonitoring.Web.Hubs
 @using Microsoft.AspNetCore.SignalR
 @inject AppDbContext Db
 @inject ILogger<Tests> Logger
 @inject IHubContext<StatusHub> HubContext
+@inject TestManagementService TestManagementService
 
 <PageTitle>Beheer Toetsen</PageTitle>
 
@@ -119,19 +121,56 @@
                 </div>
             }
 
-            <!-- Bestaande Toetsen -->
+            <!-- Bestaande Toetsen met Zoeken en Paginatie -->
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">📋 Bestaande Toetsen</h5>
                     
-                    @if (tests.Count == 0)
+                    <!-- Zoekbalk -->
+                    <div class="mb-3">
+                        <div class="input-group">
+                            <span class="input-group-text">🔍</span>
+                            <input type="text" 
+                                   class="form-control" 
+                                   placeholder="Zoek op toetsnaam..." 
+                                   @bind="searchTerm"
+                                   @bind:event="oninput"
+                                   @bind:after="OnSearchChangedAsync" />
+                            @if (!string.IsNullOrEmpty(searchTerm))
+                            {
+                                <button class="btn btn-outline-secondary" @onclick="ClearSearchAsync">
+                                    ❌ Wissen
+                                </button>
+                            }
+                        </div>
+                    </div>
+
+                    @if (isLoading)
                     {
-                        <p class="text-muted">Nog geen toetsen aangemaakt.</p>
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Laden...</span>
+                            </div>
+                        </div>
+                    }
+                    else if (pagedResult == null || pagedResult.Items.Count == 0)
+                    {
+                        <p class="text-muted">
+                            @if (string.IsNullOrEmpty(searchTerm))
+                            {
+                                <text>Nog geen toetsen aangemaakt.</text>
+                            }
+                            else
+                            {
+                                <text>Geen toetsen gevonden voor "@searchTerm".</text>
+                            }
+                        </p>
                     }
                     else
                     {
-                        <div class="list-group">
-                            @foreach (var t in GetSortedTests())
+                        <!-- Toetsenlijst -->
+                        <div class="list-group mb-3">
+                            @foreach (var t in pagedResult.Items)
                             {
                                 var isActive = t.IsActive;
                                 <div class="list-group-item @(isActive ? "list-group-item-success" : "")">
@@ -142,6 +181,10 @@
                                                 @if (isActive)
                                                 {
                                                     <span class="badge bg-success">🟢 Actief</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary">⚪ Inactief</span>
                                                 }
                                             </div>
                                             <div class="text-muted small">
@@ -173,10 +216,38 @@
                             }
                         </div>
 
-                        <div class="mt-3">
+                        <!-- Paginatie -->
+                        <nav aria-label="Toetsen paginatie">
+                            <ul class="pagination justify-content-center mb-3">
+                                <li class="page-item @(!pagedResult.HasPreviousPage ? "disabled" : "")">
+                                    <button class="page-link" @onclick="PreviousPageAsync" disabled="@(!pagedResult.HasPreviousPage)">
+                                        « Vorige
+                                    </button>
+                                </li>
+                                
+                                @for (int i = 1; i <= pagedResult.TotalPages; i++)
+                                {
+                                    var pageNumber = i; // Capture voor lambda
+                                    <li class="page-item @(pagedResult.PageNumber == pageNumber ? "active" : "")">
+                                        <button class="page-link" @onclick="() => GoToPageAsync(pageNumber)">
+                                            @pageNumber
+                                        </button>
+                                    </li>
+                                }
+                                
+                                <li class="page-item @(!pagedResult.HasNextPage ? "disabled" : "")">
+                                    <button class="page-link" @onclick="NextPageAsync" disabled="@(!pagedResult.HasNextPage)">
+                                        Volgende »
+                                    </button>
+                                </li>
+                            </ul>
+                        </nav>
+
+                        <!-- Statistieken -->
+                        <div class="text-center">
                             <small class="text-muted">
-                                <strong>Totaal:</strong> @tests.Count toets(en) | 
-                                <strong class="text-success">Actief:</strong> @tests.Count(t => t.IsActive)
+                                Pagina @pagedResult.PageNumber van @pagedResult.TotalPages
+                                (@pagedResult.TotalCount toets@(pagedResult.TotalCount != 1 ? "en" : ""))
                             </small>
                         </div>
                     }
@@ -187,7 +258,12 @@
 </div>
 
 @code {
-    private List<TestSession> tests = new();
+    // Paginatie en zoeken
+    private PagedResult<TestSession>? pagedResult;
+    private string searchTerm = string.Empty;
+    private int currentPage = 1;
+    private const int PageSize = 10;
+    private bool isLoading = true;
     
     // Nieuwe toets aanmaken
     private string newName = string.Empty;
@@ -210,21 +286,74 @@
     }
 
     /// <summary>
-    /// Laadt alle toetsen uit de database.
+    /// Laadt toetsen via de service met paginatie en filtering.
     /// </summary>
     private async Task LoadTestsAsync()
     {
-        tests = await Db.TestSessions.ToListAsync();
+        isLoading = true;
+        try
+        {
+            pagedResult = await TestManagementService.GetPagedTestsAsync(searchTerm, currentPage, PageSize);
+        }
+        finally
+        {
+            isLoading = false;
+        }
     }
 
     /// <summary>
-    /// Sorteert toetsen: actieve bovenaan, dan nieuw naar oud.
+    /// Handler voor zoekterm wijziging - reset naar pagina 1.
     /// </summary>
-    private IEnumerable<TestSession> GetSortedTests()
+    private async Task OnSearchChangedAsync()
     {
-        return tests
-            .OrderByDescending(t => t.IsActive)
-            .ThenByDescending(t => t.StartTime);
+        currentPage = 1;
+        await LoadTestsAsync();
+    }
+
+    /// <summary>
+    /// Wist de zoekterm en herlaadt.
+    /// </summary>
+    private async Task ClearSearchAsync()
+    {
+        searchTerm = string.Empty;
+        currentPage = 1;
+        await LoadTestsAsync();
+    }
+
+    /// <summary>
+    /// Navigeert naar de vorige pagina.
+    /// </summary>
+    private async Task PreviousPageAsync()
+    {
+        if (pagedResult?.HasPreviousPage == true)
+        {
+            currentPage--;
+            await LoadTestsAsync();
+        }
+    }
+
+    /// <summary>
+    /// Navigeert naar de volgende pagina.
+    /// </summary>
+    private async Task NextPageAsync()
+    {
+        if (pagedResult?.HasNextPage == true)
+        {
+            currentPage++;
+            await LoadTestsAsync();
+        }
+    }
+
+    /// <summary>
+    /// Navigeert naar een specifieke pagina.
+    /// </summary>
+    private async Task GoToPageAsync(int pageNumber)
+    {
+        if (pageNumber >= 1 && pageNumber <= (pagedResult?.TotalPages ?? 1))
+        {
+            currentPage = pageNumber;
+            await LoadTestsAsync();
+        }
     }
 
     /// <summary>
@@ -249,7 +378,6 @@
                 return;
             }
 
-            // Converteer lokale tijd naar UTC
             var startUtc = DateTime.SpecifyKind(startTimeLocal, DateTimeKind.Local).ToUniversalTime();
             var endUtc = DateTime.SpecifyKind(endTimeLocal, DateTimeKind.Local).ToUniversalTime();
 
@@ -281,8 +409,7 @@
     }
 
     /// <summary>
-    /// Zet een actieve toets inactief door de eindtijd op nu minus 1 seconde te zetten.
-    /// Sluit alle open verbindingen van studenten die aan deze toets deelnemen.
+    /// Zet een actieve toets inactief en sluit alle open verbindingen.
     /// </summary>
     private async Task SetInactiveAsync(TestSession test)
     {
@@ -294,35 +421,28 @@
             var now = DateTime.UtcNow;
             var disconnectCount = 0;
 
-            // 1. Zet eindtijd op nu minus 1 seconde
             test.EndTime = now.AddSeconds(-1);
 
-            // 2. Zoek alle studenten die aan deze toets deelnemen
             var students = await Db.Students
                 .Where(s => s.TestName == test.Name)
                 .ToListAsync();
 
             if (students.Count > 0)
             {
-                // 3. Haal alle student IDs op
                 var studentIds = students.Select(s => s.Id).ToList();
 
-                // 4. Zoek alle open connections van deze studenten
                 var openConnections = await Db.Connections
                     .Where(c => studentIds.Contains(c.StudentId) && c.DisconnectedAt == null)
                     .ToListAsync();
 
-                // 5. Sluit alle open connections
                 foreach (var connection in openConnections)
                 {
                     connection.DisconnectedAt = now;
                     disconnectCount++;
                 }
 
-                // 6. Voeg disconnect events toe voor elke getroffen student
                 foreach (var student in students)
                 {
-                    // Alleen event toevoegen als er daadwerkelijk een open connection was
                     var hadOpenConnection = openConnections.Any(c => c.StudentId == student.Id);
                     if (hadOpenConnection)
                     {
@@ -335,7 +455,6 @@
                         };
                         Db.Events.Add(eventLog);
 
-                        // 7. Stuur realtime SignalR update
                         await HubContext.Clients.All.SendAsync("status", new
                         {
                             mac = student.MacAddress,
@@ -351,7 +470,6 @@
                 }
             }
 
-            // Sla alle wijzigingen op
             await Db.SaveChangesAsync();
             await LoadTestsAsync();
             
@@ -425,11 +543,9 @@
                 return;
             }
 
-            // Converteer lokale tijd naar UTC
             var startUtc = DateTime.SpecifyKind(editStartTimeLocal, DateTimeKind.Local).ToUniversalTime();
             var endUtc = DateTime.SpecifyKind(editEndTimeLocal, DateTimeKind.Local).ToUniversalTime();
 
-            // Update de toets
             editingTest.Name = editName.Trim();
             editingTest.StartTime = startUtc;
             editingTest.EndTime = endUtc;
@@ -442,7 +558,6 @@
             Logger.LogInformation("Toets bijgewerkt: {TestName} ({StartTime} - {EndTime})", 
                 editingTest.Name, editingTest.StartTime, editingTest.EndTime);
 
-            // Reset bewerkingsmodus
             editingTest = null;
             editName = string.Empty;
         }
