@@ -1,92 +1,382 @@
 ﻿@page "/myscreen"
+@using Microsoft.AspNetCore.SignalR.Client
 @using StudentWifiMonitoring.Web.Data
 @using StudentWifiMonitoring.Web.Domain
-@inject AppDbContext Db
+@using StudentWifiMonitoring.Web.Services
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+@inject AppDbContext DbContext
+@inject IMacResolver MacResolver
 @inject IHttpContextAccessor HttpContextAccessor
-@inject StudentWifiMonitoring.Web.Services.IMacResolver MacResolver
+@inject NavigationManager Nav
+@inject IWebHostEnvironment Environment
+@implements IAsyncDisposable
 
-@if (!registered)
+<PageTitle>Mijn Verbindingsstatus</PageTitle>
+
+<style>
+    body, html {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+    }
+    
+    .fullscreen-status {
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        transition: background-color 0.5s ease;
+    }
+    
+    .status-connected {
+        background-color: #28a745;
+        color: white;
+    }
+    
+    .status-disconnected {
+        background-color: #dc3545;
+        color: white;
+    }
+    
+    .status-icon {
+        font-size: 120px;
+        margin-bottom: 30px;
+    }
+    
+    .status-title {
+        font-size: 48px;
+        font-weight: bold;
+        margin-bottom: 20px;
+    }
+    
+    .status-message {
+        font-size: 32px;
+        margin-bottom: 15px;
+    }
+    
+    .status-details {
+        font-size: 24px;
+        opacity: 0.9;
+        margin-top: 20px;
+    }
+    
+    .status-mac {
+        font-family: monospace;
+        font-size: 20px;
+        opacity: 0.7;
+        margin-top: 40px;
+    }
+
+    .signalr-indicator {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        padding: 8px 12px;
+        border-radius: 5px;
+        font-size: 14px;
+        background-color: rgba(0, 0, 0, 0.3);
+    }
+</style>
+
+@if (_isLoading)
 {
-    <div style="background-color:red; color:white; height:100vh; display:flex; align-items:center; justify-content:center; font-size:3rem;">
-        NIET GEREGISTREERD / NIET VERBONDEN
+    <div class="fullscreen-status status-disconnected">
+        <div class="status-icon">⏳</div>
+        <div class="status-title">Laden...</div>
+        <div class="status-message">Verbindingsstatus wordt bepaald</div>
     </div>
 }
-else if (isOnline)
+else if (!string.IsNullOrEmpty(_errorMessage))
 {
-    <div style="background-color:green; color:white; height:100vh; display:flex; align-items:center; justify-content:center; font-size:3rem;">
-        VERBONDEN — @studentName (@testName)
+    <div class="fullscreen-status status-disconnected">
+        <div class="status-icon">⚠️</div>
+        <div class="status-title">Fout</div>
+        <div class="status-message">@_errorMessage</div>
+        @if (!string.IsNullOrEmpty(_macAddress))
+        {
+            <div class="status-mac">MAC: @_macAddress</div>
+        }
+    </div>
+}
+else if (_isConnected)
+{
+    <div class="fullscreen-status status-connected">
+        <div class="status-icon">✅</div>
+        <div class="status-title">Verbonden</div>
+        <div class="status-message">Je bent succesvol verbonden!</div>
+        <div class="status-details">
+            <div>Naam: @_studentName</div>
+            <div>Toets: @_testName</div>
+        </div>
+        <div class="status-mac">@_macAddress</div>
+        @if (_isSignalRConnected)
+        {
+            <div class="signalr-indicator">
+                <span>🟢 Realtime</span>
+            </div>
+        }
     </div>
 }
 else
 {
-    <div style="background-color:red; color:white; height:100vh; display:flex; align-items:center; justify-content:center; font-size:3rem;">
-        GEEN VERBINDING — @studentName (@testName)
+    <div class="fullscreen-status status-disconnected">
+        <div class="status-icon">❌</div>
+        <div class="status-title">Niet Verbonden</div>
+        @if (_student != null)
+        {
+            <div class="status-message">Je bent geregistreerd maar niet verbonden</div>
+            <div class="status-details">
+                <div>Naam: @_studentName</div>
+                <div>Toets: @_testName</div>
+            </div>
+        }
+        else
+        {
+            <div class="status-message">Je bent nog niet geregistreerd</div>
+            <div class="status-details">Meld je eerst aan via de registratiepagina</div>
+        }
+        <div class="status-mac">@_macAddress</div>
+        @if (_isSignalRConnected)
+        {
+            <div class="signalr-indicator">
+                <span>🟢 Realtime</span>
+            </div>
+        }
     </div>
 }
 
 @code {
-    private string studentName = "";
-    private string testName = "";
-    private bool registered = false;
-    private bool isOnline = false;
-    private string? mac;
+    [SupplyParameterFromQuery(Name = "mac")]
+    private string? QueryMac { get; set; }
 
-    private PeriodicTimer? timer;
-    private CancellationTokenSource? cts;
+    private string? _macAddress;
+    private Student? _student;
+    private bool _isConnected;
+    private bool _isLoading = true;
+    private string? _errorMessage;
+    private string? _studentName;
+    private string? _testName;
+    private HubConnection? _hubConnection;
+    private bool _isSignalRConnected;
 
     protected override async Task OnInitializedAsync()
     {
-        var ip = HttpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
-        mac = ip != null ? MacResolver.GetMacForIp(ip) : null;
-
-        if (mac != null)
+        try
         {
-            var student = Db.Students.FirstOrDefault(s => s.MacAddress == mac);
-            if (student != null)
+            // Bepaal MAC-adres
+            _macAddress = await DetermineMacAddressAsync();
+
+            if (string.IsNullOrEmpty(_macAddress))
             {
-                registered = true;
-                studentName = student.Name;
-                testName = student.TestName;
-
-                // initial check
-                isOnline = Db.Connections.Any(c => c.DisconnectedAt == null && c.Student != null && c.Student.MacAddress == mac);
-
-                // start background polling
-                cts = new CancellationTokenSource();
-                timer = new PeriodicTimer(TimeSpan.FromSeconds(2)); // adjust interval as needed
-                _ = PollStatusAsync(cts.Token);
+                _errorMessage = "Kan MAC-adres niet bepalen";
+                _isLoading = false;
+                return;
             }
+
+            // Laad student en status
+            await LoadStudentStatusAsync();
+
+            // Setup SignalR voor realtime updates
+            await SetupSignalRConnectionAsync();
+
+            _isLoading = false;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Fout bij laden: {ex.Message}";
+            _isLoading = false;
         }
     }
 
-    private async Task PollStatusAsync(CancellationToken token)
+    /// <summary>
+    /// Bepaalt het MAC-adres van de huidige client.
+    /// In development: gebruik querystring als fallback.
+    /// In productie: gebruik alleen IMacResolver.
+    /// </summary>
+    private async Task<string?> DetermineMacAddressAsync()
+    {
+        // Development fallback: querystring parameter
+        if (Environment.IsDevelopment() && !string.IsNullOrEmpty(QueryMac))
+        {
+            return QueryMac.ToLowerInvariant();
+        }
+
+        // Productie: gebruik IMacResolver om MAC-adres te bepalen van client IP
+        var httpContext = HttpContextAccessor.HttpContext;
+        if (httpContext == null)
+        {
+            return null;
+        }
+
+        var clientIp = httpContext.Connection.RemoteIpAddress?.ToString();
+        if (string.IsNullOrEmpty(clientIp))
+        {
+            return null;
+        }
+
+        return MacResolver.GetMacForIp(clientIp);
+    }
+
+    /// <summary>
+    /// Laadt de student en bepaalt de verbindingsstatus.
+    /// </summary>
+    private async Task LoadStudentStatusAsync()
+    {
+        if (string.IsNullOrEmpty(_macAddress))
+        {
+            return;
+        }
+
+        // Zoek student in database
+        _student = await DbContext.Students
+            .FirstOrDefaultAsync(s => s.MacAddress == _macAddress);
+
+        if (_student == null)
+        {
+            _isConnected = false;
+            return;
+        }
+
+        // Bepaal of student momenteel verbonden is
+        var openConnection = await DbContext.Connections
+            .Where(c => c.StudentId == _student.Id && c.DisconnectedAt == null)
+            .OrderByDescending(c => c.ConnectedAt)
+            .FirstOrDefaultAsync();
+
+        _isConnected = openConnection != null;
+        _studentName = _student.Name;
+        _testName = _student.TestName;
+    }
+
+    /// <summary>
+    /// Bouwt de SignalR HubConnection op voor realtime status updates.
+    /// </summary>
+    private async Task SetupSignalRConnectionAsync()
     {
         try
         {
-            // run until cancelled
-            while (await timer!.WaitForNextTickAsync(token))
+            _hubConnection = new HubConnectionBuilder()
+                .WithUrl(Nav.ToAbsoluteUri("/hubs/status"))
+                .WithAutomaticReconnect()
+                .Build();
+
+            // Luister naar status events van MonitoringService
+            _hubConnection.On<StatusUpdatePayload>("status", async (payload) =>
             {
-                var online = Db.Connections.Any(c => c.DisconnectedAt == null && c.Student != null && c.Student.MacAddress == mac);
-                if (online != isOnline)
+                await HandleStatusUpdateAsync(payload);
+            });
+
+            // Connection lifecycle handlers
+            _hubConnection.Reconnecting += error =>
+            {
+                _isSignalRConnected = false;
+                InvokeAsync(StateHasChanged);
+                return Task.CompletedTask;
+            };
+
+            _hubConnection.Reconnected += connectionId =>
+            {
+                _isSignalRConnected = true;
+                // Reload status na reconnect
+                _ = Task.Run(async () =>
                 {
-                    isOnline = online;
+                    await LoadStudentStatusAsync();
                     await InvokeAsync(StateHasChanged);
+                });
+                return Task.CompletedTask;
+            };
+
+            _hubConnection.Closed += error =>
+            {
+                _isSignalRConnected = false;
+                InvokeAsync(StateHasChanged);
+                return Task.CompletedTask;
+            };
+
+            // Start verbinding
+            await _hubConnection.StartAsync();
+            _isSignalRConnected = true;
+        }
+        catch (Exception ex)
+        {
+            // SignalR fout - pagina blijft werken maar zonder realtime updates
+            Console.WriteLine($"SignalR verbinding mislukt: {ex.Message}");
+            _isSignalRConnected = false;
+        }
+    }
+
+    /// <summary>
+    /// Verwerkt een realtime status update van MonitoringService via SignalR.
+    /// </summary>
+    private async Task HandleStatusUpdateAsync(StatusUpdatePayload payload)
+    {
+        try
+        {
+            // Controleer of dit event voor deze student is
+            if (string.IsNullOrEmpty(payload.Mac) || 
+                payload.Mac.ToLowerInvariant() != _macAddress?.ToLowerInvariant())
+            {
+                return;
+            }
+
+            // Update verbindingsstatus
+            if (payload.Status == "connected")
+            {
+                _isConnected = true;
+                
+                // Update student info als deze beschikbaar is in payload
+                if (!string.IsNullOrEmpty(payload.Name))
+                {
+                    _studentName = payload.Name;
+                }
+                if (!string.IsNullOrEmpty(payload.TestName))
+                {
+                    _testName = payload.TestName;
+                }
+
+                // Als student nog niet bekend was, laad deze nu
+                if (_student == null && !string.IsNullOrEmpty(payload.Name))
+                {
+                    await LoadStudentStatusAsync();
                 }
             }
+            else if (payload.Status == "disconnected")
+            {
+                _isConnected = false;
+            }
+
+            // Trigger UI update
+            await InvokeAsync(StateHasChanged);
         }
-        catch (OperationCanceledException)
+        catch (Exception ex)
         {
-            // expected on dispose
+            Console.WriteLine($"Fout bij verwerken status update: {ex.Message}");
         }
     }
 
+    /// <summary>
+    /// Cleanup SignalR verbinding bij dispose.
+    /// </summary>
     public async ValueTask DisposeAsync()
     {
-        try
+        if (_hubConnection is not null)
         {
-            cts?.Cancel();
-            timer?.Dispose();
+            await _hubConnection.DisposeAsync();
         }
-        catch { }
+    }
+
+    /// <summary>
+    /// Payload structuur voor status updates van MonitoringService.
+    /// </summary>
+    private class StatusUpdatePayload
+    {
+        public string Mac { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public string? Name { get; set; }
+        public string? TestName { get; set; }
     }
 }
