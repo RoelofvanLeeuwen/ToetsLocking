@@ -3,101 +3,204 @@
 @using Microsoft.EntityFrameworkCore
 @using StudentWifiMonitoring.Web.Data
 @using StudentWifiMonitoring.Web.Domain
+@using StudentWifiMonitoring.Web.Hubs
+@using Microsoft.AspNetCore.SignalR
 @inject AppDbContext Db
 @inject ILogger<Tests> Logger
+@inject IHubContext<StatusHub> HubContext
 
 <PageTitle>Beheer Toetsen</PageTitle>
 
 <div class="container mt-4">
-    <h3>Beheer Toetsen</h3>
-
-    <div class="card mt-3">
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h3>📝 Beheer Toetsen</h3>
+        </div>
         <div class="card-body">
-            <h5 class="card-title">Nieuwe Toets Aanmaken</h5>
-            
-            <div class="mb-3">
-                <label for="testName" class="form-label">Toetsnaam:</label>
-                <input type="text" 
-                       class="form-control" 
-                       id="testName" 
-                       @bind="newName" 
-                       placeholder="Voer toetsnaam in" />
-            </div>
-
-            <div class="mb-3">
-                <label for="startTime" class="form-label">Starttijd (lokale tijd):</label>
-                <input type="datetime-local" 
-                       class="form-control" 
-                       id="startTime" 
-                       @bind="startTimeLocal" />
-            </div>
-
-            <div class="mb-3">
-                <label for="endTime" class="form-label">Eindtijd (lokale tijd):</label>
-                <input type="datetime-local" 
-                       class="form-control" 
-                       id="endTime" 
-                       @bind="endTimeLocal" />
-            </div>
-
-            <button class="btn btn-primary" @onclick="CreateTest">Toets Aanmaken</button>
-
             @if (!string.IsNullOrEmpty(errorMessage))
             {
-                <div class="alert alert-danger mt-3">
+                <div class="alert alert-danger alert-dismissible fade show">
                     @errorMessage
+                    <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
                 </div>
             }
 
             @if (!string.IsNullOrEmpty(successMessage))
             {
-                <div class="alert alert-success mt-3">
+                <div class="alert alert-success alert-dismissible fade show">
                     @successMessage
+                    <button type="button" class="btn-close" @onclick="() => successMessage = string.Empty"></button>
                 </div>
             }
-        </div>
-    </div>
 
-    <div class="card mt-4">
-        <div class="card-body">
-            <h5 class="card-title">Bestaande Toetsen</h5>
-            
-            @if (tests.Count == 0)
+            @if (editingTest == null)
             {
-                <p class="text-muted">Nog geen toetsen aangemaakt.</p>
+                <!-- Nieuwe Toets Aanmaken -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">➕ Nieuwe Toets Aanmaken</h5>
+                        
+                        <div class="mb-3">
+                            <label for="testName" class="form-label">Toetsnaam:</label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="testName" 
+                                   @bind="newName" 
+                                   placeholder="Voer toetsnaam in" />
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="startTime" class="form-label">Starttijd (lokale tijd):</label>
+                                <input type="datetime-local" 
+                                       class="form-control" 
+                                       id="startTime" 
+                                       @bind="startTimeLocal" />
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="endTime" class="form-label">Eindtijd (lokale tijd):</label>
+                                <input type="datetime-local" 
+                                       class="form-control" 
+                                       id="endTime" 
+                                       @bind="endTimeLocal" />
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary" @onclick="CreateTestAsync">
+                            ➕ Toets Aanmaken
+                        </button>
+                    </div>
+                </div>
             }
             else
             {
-                <ul class="list-group">
-                    @foreach (var t in tests)
-                    {
-                        <li class="list-group-item">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <strong>@t.Name</strong>
-                                    <br />
-                                    <small class="text-muted">
-                                        @t.StartTime.ToLocalTime().ToString("dd-MM-yyyy HH:mm") - @t.EndTime.ToLocalTime().ToString("dd-MM-yyyy HH:mm")
-                                    </small>
-                                </div>
-                                @if (t.IsActive)
-                                {
-                                    <span class="badge bg-success">Actief</span>
-                                }
+                <!-- Toets Bewerken -->
+                <div class="card mb-4 border-warning">
+                    <div class="card-body">
+                        <h5 class="card-title">✏️ Toets Bewerken</h5>
+                        
+                        <div class="mb-3">
+                            <label for="editName" class="form-label">Toetsnaam:</label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="editName" 
+                                   @bind="editName" 
+                                   placeholder="Voer toetsnaam in" />
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="editStartTime" class="form-label">Starttijd (lokale tijd):</label>
+                                <input type="datetime-local" 
+                                       class="form-control" 
+                                       id="editStartTime" 
+                                       @bind="editStartTimeLocal" />
                             </div>
-                        </li>
-                    }
-                </ul>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="editEndTime" class="form-label">Eindtijd (lokale tijd):</label>
+                                <input type="datetime-local" 
+                                       class="form-control" 
+                                       id="editEndTime" 
+                                       @bind="editEndTimeLocal" />
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-success" @onclick="SaveEditAsync">
+                                💾 Opslaan
+                            </button>
+                            <button class="btn btn-secondary" @onclick="CancelEdit">
+                                ❌ Annuleren
+                            </button>
+                        </div>
+                    </div>
+                </div>
             }
+
+            <!-- Bestaande Toetsen -->
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">📋 Bestaande Toetsen</h5>
+                    
+                    @if (tests.Count == 0)
+                    {
+                        <p class="text-muted">Nog geen toetsen aangemaakt.</p>
+                    }
+                    else
+                    {
+                        <div class="list-group">
+                            @foreach (var t in GetSortedTests())
+                            {
+                                var isActive = t.IsActive;
+                                <div class="list-group-item @(isActive ? "list-group-item-success" : "")">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <strong class="me-2">@t.Name</strong>
+                                                @if (isActive)
+                                                {
+                                                    <span class="badge bg-success">🟢 Actief</span>
+                                                }
+                                            </div>
+                                            <div class="text-muted small">
+                                                <div>
+                                                    <strong>Start:</strong> @t.StartTime.ToLocalTime().ToString("dd-MM-yyyy HH:mm")
+                                                </div>
+                                                <div>
+                                                    <strong>Eind:</strong> @t.EndTime.ToLocalTime().ToString("dd-MM-yyyy HH:mm")
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="d-flex flex-column gap-2">
+                                            @if (isActive)
+                                            {
+                                                <button class="btn btn-sm btn-warning" 
+                                                        @onclick="() => SetInactiveAsync(t)"
+                                                        disabled="@(editingTest != null)">
+                                                    ⏹️ Inactief zetten
+                                                </button>
+                                            }
+                                            <button class="btn btn-sm btn-primary" 
+                                                    @onclick="() => StartEdit(t)"
+                                                    disabled="@(editingTest != null)">
+                                                ✏️ Bewerken
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="mt-3">
+                            <small class="text-muted">
+                                <strong>Totaal:</strong> @tests.Count toets(en) | 
+                                <strong class="text-success">Actief:</strong> @tests.Count(t => t.IsActive)
+                            </small>
+                        </div>
+                    }
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
 @code {
     private List<TestSession> tests = new();
+    
+    // Nieuwe toets aanmaken
     private string newName = string.Empty;
     private DateTime startTimeLocal = DateTime.Now;
     private DateTime endTimeLocal = DateTime.Now.AddHours(2);
+    
+    // Toets bewerken
+    private TestSession? editingTest;
+    private string editName = string.Empty;
+    private DateTime editStartTimeLocal;
+    private DateTime editEndTimeLocal;
+    
+    // Berichten
     private string errorMessage = string.Empty;
     private string successMessage = string.Empty;
 
@@ -106,12 +209,28 @@
         await LoadTestsAsync();
     }
 
+    /// <summary>
+    /// Laadt alle toetsen uit de database.
+    /// </summary>
     private async Task LoadTestsAsync()
     {
-        tests = await Db.TestSessions.OrderByDescending(t => t.StartTime).ToListAsync();
+        tests = await Db.TestSessions.ToListAsync();
     }
 
-    private async Task CreateTest()
+    /// <summary>
+    /// Sorteert toetsen: actieve bovenaan, dan nieuw naar oud.
+    /// </summary>
+    private IEnumerable<TestSession> GetSortedTests()
+    {
+        return tests
+            .OrderByDescending(t => t.IsActive)
+            .ThenByDescending(t => t.StartTime);
+    }
+
+    /// <summary>
+    /// Maakt een nieuwe toets aan.
+    /// </summary>
+    private async Task CreateTestAsync()
     {
         errorMessage = string.Empty;
         successMessage = string.Empty;
@@ -130,8 +249,7 @@
                 return;
             }
 
-            // Converteer expliciete lokale tijd naar UTC
-            // datetime-local geeft unspecified DateTime, dus eerst als Local markeren
+            // Converteer lokale tijd naar UTC
             var startUtc = DateTime.SpecifyKind(startTimeLocal, DateTimeKind.Local).ToUniversalTime();
             var endUtc = DateTime.SpecifyKind(endTimeLocal, DateTimeKind.Local).ToUniversalTime();
 
@@ -159,6 +277,179 @@
         {
             Logger.LogError(ex, "Fout bij het aanmaken van toets");
             errorMessage = "Er is een fout opgetreden bij het aanmaken van de toets.";
+        }
+    }
+
+    /// <summary>
+    /// Zet een actieve toets inactief door de eindtijd op nu minus 1 seconde te zetten.
+    /// Sluit alle open verbindingen van studenten die aan deze toets deelnemen.
+    /// </summary>
+    private async Task SetInactiveAsync(TestSession test)
+    {
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+
+        try
+        {
+            var now = DateTime.UtcNow;
+            var disconnectCount = 0;
+
+            // 1. Zet eindtijd op nu minus 1 seconde
+            test.EndTime = now.AddSeconds(-1);
+
+            // 2. Zoek alle studenten die aan deze toets deelnemen
+            var students = await Db.Students
+                .Where(s => s.TestName == test.Name)
+                .ToListAsync();
+
+            if (students.Count > 0)
+            {
+                // 3. Haal alle student IDs op
+                var studentIds = students.Select(s => s.Id).ToList();
+
+                // 4. Zoek alle open connections van deze studenten
+                var openConnections = await Db.Connections
+                    .Where(c => studentIds.Contains(c.StudentId) && c.DisconnectedAt == null)
+                    .ToListAsync();
+
+                // 5. Sluit alle open connections
+                foreach (var connection in openConnections)
+                {
+                    connection.DisconnectedAt = now;
+                    disconnectCount++;
+                }
+
+                // 6. Voeg disconnect events toe voor elke getroffen student
+                foreach (var student in students)
+                {
+                    // Alleen event toevoegen als er daadwerkelijk een open connection was
+                    var hadOpenConnection = openConnections.Any(c => c.StudentId == student.Id);
+                    if (hadOpenConnection)
+                    {
+                        var eventLog = new EventLog
+                        {
+                            StudentId = student.Id,
+                            TestSessionId = test.Id,
+                            EventType = EventType.Disconnected,
+                            Timestamp = now
+                        };
+                        Db.Events.Add(eventLog);
+
+                        // 7. Stuur realtime SignalR update
+                        await HubContext.Clients.All.SendAsync("status", new
+                        {
+                            mac = student.MacAddress,
+                            status = "disconnected",
+                            name = student.Name,
+                            testName = student.TestName
+                        });
+
+                        Logger.LogInformation(
+                            "Student {Name} ({MacAddress}) automatisch verbroken door toets inactief zetten: {TestName}", 
+                            student.Name, student.MacAddress, test.Name);
+                    }
+                }
+            }
+
+            // Sla alle wijzigingen op
+            await Db.SaveChangesAsync();
+            await LoadTestsAsync();
+            
+            if (disconnectCount > 0)
+            {
+                successMessage = $"Toets '{test.Name}' is inactief gezet en {disconnectCount} actieve verbinding(en) zijn gesloten.";
+            }
+            else
+            {
+                successMessage = $"Toets '{test.Name}' is inactief gezet.";
+            }
+            
+            Logger.LogInformation("Toets inactief gezet: {TestName}, {DisconnectCount} verbindingen gesloten", 
+                test.Name, disconnectCount);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Fout bij het inactief zetten van toets");
+            errorMessage = "Er is een fout opgetreden bij het inactief zetten van de toets.";
+        }
+    }
+
+    /// <summary>
+    /// Start bewerkingsmodus voor een toets.
+    /// </summary>
+    private void StartEdit(TestSession test)
+    {
+        editingTest = test;
+        editName = test.Name;
+        editStartTimeLocal = test.StartTime.ToLocalTime();
+        editEndTimeLocal = test.EndTime.ToLocalTime();
+        
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+    }
+
+    /// <summary>
+    /// Annuleert bewerkingsmodus.
+    /// </summary>
+    private void CancelEdit()
+    {
+        editingTest = null;
+        editName = string.Empty;
+        errorMessage = string.Empty;
+    }
+
+    /// <summary>
+    /// Slaat bewerkingen op.
+    /// </summary>
+    private async Task SaveEditAsync()
+    {
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+
+        try
+        {
+            if (editingTest == null)
+            {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(editName))
+            {
+                errorMessage = "Voer een toetsnaam in.";
+                return;
+            }
+
+            if (editEndTimeLocal <= editStartTimeLocal)
+            {
+                errorMessage = "Eindtijd moet na de starttijd liggen.";
+                return;
+            }
+
+            // Converteer lokale tijd naar UTC
+            var startUtc = DateTime.SpecifyKind(editStartTimeLocal, DateTimeKind.Local).ToUniversalTime();
+            var endUtc = DateTime.SpecifyKind(editEndTimeLocal, DateTimeKind.Local).ToUniversalTime();
+
+            // Update de toets
+            editingTest.Name = editName.Trim();
+            editingTest.StartTime = startUtc;
+            editingTest.EndTime = endUtc;
+
+            await Db.SaveChangesAsync();
+            await LoadTestsAsync();
+
+            successMessage = $"Toets '{editingTest.Name}' succesvol bijgewerkt.";
+
+            Logger.LogInformation("Toets bijgewerkt: {TestName} ({StartTime} - {EndTime})", 
+                editingTest.Name, editingTest.StartTime, editingTest.EndTime);
+
+            // Reset bewerkingsmodus
+            editingTest = null;
+            editName = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Fout bij het opslaan van toets");
+            errorMessage = "Er is een fout opgetreden bij het opslaan van de toets.";
         }
     }
 }
