@@ -1,17 +1,8 @@
-﻿@* <nav>
-    <ul>
-        <li><NavLink href="/">Dashboard</NavLink></li>
-        <li><NavLink href="/register">Registratie</NavLink></li>
-        <li><NavLink href="/status">Mijn Status</NavLink></li>
-        <li><NavLink href="/myscreen">Mijn Scherm</NavLink></li>
-        <li><NavLink href="/tests">Toetsbeheer</NavLink></li>
-        <li><NavLink href="/export">Export Alles</NavLink></li>
-        <li><NavLink href="/export-by-test">Export per Toets</NavLink></li>
-    </ul>
-</nav> *@
+﻿@inject IWebHostEnvironment HostEnvironment
+
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
-        <a class="navbar-brand" href="">BlazorApp2</a>
+        <a class="navbar-brand" href="">Student Wifi Monitoring</a>
     </div>
 </div>
 
@@ -21,19 +12,7 @@
     <nav class="flex-column">
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Dashboard
             </NavLink>
         </div>
 
@@ -42,6 +21,45 @@
                 <span class="bi bi-pencil-square" aria-hidden="true"></span> Registreren
             </NavLink>
         </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="tests">
+                <span class="bi bi-list-check" aria-hidden="true"></span> Toetsen
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="status">
+                <span class="bi bi-wifi" aria-hidden="true"></span> Status
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="myscreen">
+                <span class="bi bi-display" aria-hidden="true"></span> Mijn Scherm
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="export">
+                <span class="bi bi-download" aria-hidden="true"></span> Export
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="export-by-test">
+                <span class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></span> Export per Toets
+            </NavLink>
+        </div>
+
+        @if (HostEnvironment.IsDevelopment())
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="dev/stations">
+                    <span class="bi bi-wrench" aria-hidden="true"></span> Dev Stations
+                </NavLink>
+            </div>
+        }
     </nav>
 </div>
 
