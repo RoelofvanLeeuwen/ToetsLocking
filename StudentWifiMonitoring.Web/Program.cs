@@ -3,6 +3,7 @@ using StudentWifiMonitoring.Web.Components;
 using StudentWifiMonitoring.Web.Data;
 using StudentWifiMonitoring.Web.Hubs;
 using StudentWifiMonitoring.Web.Services;
+using StudentWifiMonitoring.Web.Services.Interfaces;
 
 namespace StudentWifiMonitoring.Web;
 
@@ -18,9 +19,9 @@ public class Program
             .AddInteractiveServerComponents();
 
         builder.Services.AddHttpContextAccessor();
-        
+
         builder.Services.AddScoped<DashboardService>();
-        builder.Services.AddScoped<TestManagementService>();
+        builder.Services.AddScoped<ITestManagementService, TestManagementService>();
 
         builder.Services.AddSignalR();
         builder.Services.AddHostedService<MonitoringService>();

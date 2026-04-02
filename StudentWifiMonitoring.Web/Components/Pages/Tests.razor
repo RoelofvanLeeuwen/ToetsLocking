@@ -1,15 +1,9 @@
 ﻿@page "/tests"
 @rendermode InteractiveServer
-@using Microsoft.EntityFrameworkCore
-@using StudentWifiMonitoring.Web.Data
-@using StudentWifiMonitoring.Web.Domain
-@using StudentWifiMonitoring.Web.Services
-@using StudentWifiMonitoring.Web.Hubs
-@using Microsoft.AspNetCore.SignalR
-@inject AppDbContext Db
+@using StudentWifiMonitoring.Web.DTOs.Tests
+@using StudentWifiMonitoring.Web.Services.Interfaces
+@inject ITestManagementService TestManagementService
 @inject ILogger<Tests> Logger
-@inject IHubContext<StatusHub> HubContext
-@inject TestManagementService TestManagementService
 
 <PageTitle>Beheer Toetsen</PageTitle>
 
@@ -337,27 +331,27 @@
 
 @code {
     // Paginatie en zoeken
-    private PagedResult<TestSession>? pagedResult;
+    private PagedResultDto<TestSessionDto>? pagedResult;
     private string searchTerm = string.Empty;
     private int currentPage = 1;
     private const int PageSize = 10;
     private bool isLoading = true;
-    
+
     // Nieuwe toets aanmaken
     private string newName = string.Empty;
     private DateTime startTimeLocal = DateTime.Now;
     private DateTime endTimeLocal = DateTime.Now.AddHours(2);
-    
+
     // Toets bewerken
-    private TestSession? editingTest;
+    private TestSessionDto? editingTest;
     private string editName = string.Empty;
     private DateTime editStartTimeLocal;
     private DateTime editEndTimeLocal;
-    
+
     // Bevestigingsmodal voor inactief zetten
     private bool showConfirmModal = false;
-    private TestSession? testToDeactivate;
-    
+    private TestSessionDto? testToDeactivate;
+
     // Berichten
     private string errorMessage = string.Empty;
     private string successMessage = string.Empty;
@@ -439,7 +433,7 @@
     }
 
     /// <summary>
-    /// Maakt een nieuwe toets aan.
+    /// Maakt een nieuwe toets aan via de service.
     /// </summary>
     private async Task CreateTestAsync()
     {
@@ -448,40 +442,29 @@
 
         try
         {
-            if (string.IsNullOrWhiteSpace(newName))
+            var createDto = new TestSessionCreateDto
             {
-                errorMessage = "Voer een toetsnaam in.";
-                return;
-            }
-
-            if (endTimeLocal <= startTimeLocal)
-            {
-                errorMessage = "Eindtijd moet na de starttijd liggen.";
-                return;
-            }
-
-            var startUtc = DateTime.SpecifyKind(startTimeLocal, DateTimeKind.Local).ToUniversalTime();
-            var endUtc = DateTime.SpecifyKind(endTimeLocal, DateTimeKind.Local).ToUniversalTime();
-
-            var session = new TestSession 
-            { 
-                Name = newName.Trim(), 
-                StartTime = startUtc, 
-                EndTime = endUtc 
+                Name = newName,
+                StartTimeLocal = startTimeLocal,
+                EndTimeLocal = endTimeLocal
             };
 
-            Db.TestSessions.Add(session);
-            await Db.SaveChangesAsync();
-            
-            await LoadTestsAsync();
-            
-            successMessage = $"Toets '{session.Name}' succesvol aangemaakt.";
-            newName = string.Empty;
-            startTimeLocal = DateTime.Now;
-            endTimeLocal = DateTime.Now.AddHours(2);
+            var result = await TestManagementService.CreateTestAsync(createDto);
 
-            Logger.LogInformation("Toets aangemaakt: {TestName} ({StartTime} - {EndTime})", 
-                session.Name, session.StartTime, session.EndTime);
+            if (result.Success)
+            {
+                await LoadTestsAsync();
+                successMessage = $"Toets '{newName.Trim()}' succesvol aangemaakt.";
+
+                // Reset form
+                newName = string.Empty;
+                startTimeLocal = DateTime.Now;
+                endTimeLocal = DateTime.Now.AddHours(2);
+            }
+            else
+            {
+                errorMessage = result.ErrorMessage ?? "Er is een fout opgetreden.";
+            }
         }
         catch (Exception ex)
         {
@@ -493,7 +476,7 @@
     /// <summary>
     /// Toont bevestigingsmodal voordat toets inactief wordt gezet.
     /// </summary>
-    private Task ShowDeactivateConfirmAsync(TestSession test)
+    private Task ShowDeactivateConfirmAsync(TestSessionDto test)
     {
         testToDeactivate = test;
         showConfirmModal = true;
@@ -512,7 +495,7 @@
     }
 
     /// <summary>
-    /// Bevestigt en voert het inactief zetten uit.
+    /// Bevestigt en voert het inactief zetten uit via de service.
     /// </summary>
     private async Task ConfirmDeactivateAsync()
     {
@@ -525,81 +508,27 @@
     }
 
     /// <summary>
-    /// Zet een actieve toets inactief en sluit alle open verbindingen.
+    /// Zet een actieve toets inactief via de service.
     /// </summary>
-    private async Task SetInactiveAsync(TestSession test)
+    private async Task SetInactiveAsync(TestSessionDto test)
     {
         errorMessage = string.Empty;
         successMessage = string.Empty;
 
         try
         {
-            var now = DateTime.UtcNow;
-            var disconnectCount = 0;
+            var result = await TestManagementService.DeactivateTestAsync(test.Id);
 
-            test.EndTime = now.AddSeconds(-1);
-
-            var students = await Db.Students
-                .Where(s => s.TestName == test.Name)
-                .ToListAsync();
-
-            if (students.Count > 0)
-            {
-                var studentIds = students.Select(s => s.Id).ToList();
-
-                var openConnections = await Db.Connections
-                    .Where(c => studentIds.Contains(c.StudentId) && c.DisconnectedAt == null)
-                    .ToListAsync();
-
-                foreach (var connection in openConnections)
-                {
-                    connection.DisconnectedAt = now;
-                    disconnectCount++;
-                }
-
-                foreach (var student in students)
-                {
-                    var hadOpenConnection = openConnections.Any(c => c.StudentId == student.Id);
-                    if (hadOpenConnection)
-                    {
-                        var eventLog = new EventLog
-                        {
-                            StudentId = student.Id,
-                            TestSessionId = test.Id,
-                            EventType = EventType.Disconnected,
-                            Timestamp = now
-                        };
-                        Db.Events.Add(eventLog);
-
-                        await HubContext.Clients.All.SendAsync("status", new
-                        {
-                            mac = student.MacAddress,
-                            status = "disconnected",
-                            name = student.Name,
-                            testName = student.TestName
-                        });
-
-                        Logger.LogInformation(
-                            "Student {Name} ({MacAddress}) automatisch verbroken door toets inactief zetten: {TestName}", 
-                            student.Name, student.MacAddress, test.Name);
-                    }
-                }
-            }
-
-            await Db.SaveChangesAsync();
             await LoadTestsAsync();
-            
-            if (disconnectCount > 0)
+
+            if (result.DisconnectedStudentsCount > 0)
             {
-                successMessage = $"✅ Toets '{test.Name}' is inactief gezet en {disconnectCount} actieve verbinding(en) zijn gesloten.";
+                successMessage = $"✅ Toets '{result.TestName}' is inactief gezet en {result.DisconnectedStudentsCount} actieve verbinding(en) zijn gesloten.";
             }
             else
             {
-                successMessage = $"✅ Toets '{test.Name}' is inactief gezet.";
+                successMessage = $"✅ Toets '{result.TestName}' is inactief gezet.";
             }
-            
-            Logger.LogInformation("Toets inactief gezet: {TestName}, {DisconnectCount} verbindingen gesloten", 
-                test.Name, disconnectCount);
         }
         catch (Exception ex)
         {
@@ -611,13 +540,13 @@
     /// <summary>
     /// Start bewerkingsmodus voor een toets.
     /// </summary>
-    private void StartEdit(TestSession test)
+    private void StartEdit(TestSessionDto test)
     {
         editingTest = test;
         editName = test.Name;
         editStartTimeLocal = test.StartTime.ToLocalTime();
         editEndTimeLocal = test.EndTime.ToLocalTime();
-        
+
         errorMessage = string.Empty;
         successMessage = string.Empty;
     }
@@ -633,7 +562,7 @@
     }
 
     /// <summary>
-    /// Slaat bewerkingen op.
+    /// Slaat bewerkingen op via de service.
     /// </summary>
     private async Task SaveEditAsync()
     {
@@ -647,35 +576,29 @@
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(editName))
+            var updateDto = new TestSessionUpdateDto
             {
-                errorMessage = "Voer een toetsnaam in.";
-                return;
-            }
+                Id = editingTest.Id,
+                Name = editName,
+                StartTimeLocal = editStartTimeLocal,
+                EndTimeLocal = editEndTimeLocal
+            };
 
-            if (editEndTimeLocal <= editStartTimeLocal)
+            var result = await TestManagementService.UpdateTestAsync(updateDto);
+
+            if (result.Success)
             {
-                errorMessage = "Eindtijd moet na de starttijd liggen.";
-                return;
+                await LoadTestsAsync();
+                successMessage = $"✅ Toets '{editName.Trim()}' succesvol bijgewerkt.";
+
+                // Reset edit mode
+                editingTest = null;
+                editName = string.Empty;
             }
-
-            var startUtc = DateTime.SpecifyKind(editStartTimeLocal, DateTimeKind.Local).ToUniversalTime();
-            var endUtc = DateTime.SpecifyKind(editEndTimeLocal, DateTimeKind.Local).ToUniversalTime();
-
-            editingTest.Name = editName.Trim();
-            editingTest.StartTime = startUtc;
-            editingTest.EndTime = endUtc;
-
-            await Db.SaveChangesAsync();
-            await LoadTestsAsync();
-
-            successMessage = $"✅ Toets '{editingTest.Name}' succesvol bijgewerkt.";
-
-            Logger.LogInformation("Toets bijgewerkt: {TestName} ({StartTime} - {EndTime})", 
-                editingTest.Name, editingTest.StartTime, editingTest.EndTime);
-
-            editingTest = null;
-            editName = string.Empty;
+            else
+            {
+                errorMessage = result.ErrorMessage ?? "Er is een fout opgetreden.";
+            }
         }
         catch (Exception ex)
         {
