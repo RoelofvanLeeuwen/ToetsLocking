@@ -52,10 +52,40 @@ Copilot moet code voorstellen die:
 
 - Houd de architectuur simpel.
 - Gebruik geen extra lagen of patterns tenzij daar een duidelijke noodzaak voor is.
-- Voeg geen repository pattern toe bovenop EF Core.
+- **In de huidige refactorstappen: voeg nog geen repository pattern toe.** Repositories zijn een mogelijke latere architectuurstap, maar maken nu geen deel uit van de gewenste tussenstructuur.
 - Gebruik de bestaande projectstructuur zoals die al in de repository staat.
-- Gebruik bestaande mappen zoals `Data`, `Domain`, `Services`, `Hubs` en `Pages`.
+- Gebruik bestaande mappen zoals `Data`, `Domain`, `Services`, `Hubs`, `DTOs` en `Pages`.
 - Voeg geen nieuwe architectuurlagen toe zoals `Application`, `Infrastructure` of `Core` tenzij daar expliciet om gevraagd wordt.
+
+### Gewenste tussenstructuur (nu implementeren)
+
+**Blazor pagina's:**
+- Blazor pagina's gebruiken NOOIT direct `AppDbContext`.
+- Blazor pagina's werken uitsluitend via services en interfaces.
+- Blazor pagina's werken met DTO's, niet met entities.
+
+**Services:**
+- Services worden gedefinieerd via interfaces (bijv. `IStudentService`).
+- Services bevatten alle businesslogica, queries en updates.
+- Services gebruiken in deze fase nog direct `AppDbContext` en EF Core.
+- Services doen mapping tussen entities en DTO's.
+- Services retourneren DTO's naar de UI.
+
+**DTO's (Data Transfer Objects):**
+- Gebruik DTO's voor communicatie tussen UI en services.
+- DTO's zijn simpel: enkel properties zonder logica.
+- DTO's worden gebruikt in plaats van entities in Blazor componenten.
+
+**Data:**
+- `AppDbContext` wordt alleen gebruikt door services, niet door Blazor pagina's.
+- Entities blijven in de `Domain` map.
+
+### Refactoring aanpak
+
+- Refactor per functioneel gebied in kleine stappen.
+- Begin met één pagina/functionaliteit tegelijk.
+- Test na elke stap dat functionaliteit blijft werken.
+- Houd bestaande werkende code intact tenzij expliciet aan refactoring wordt gewerkt.
 
 ## Blazor
 
@@ -63,6 +93,9 @@ Copilot moet code voorstellen die:
 - Houd code in `.razor` bestanden in `@code`.
 - Maak geen losse `.cs` code-behind bestanden voor componenten.
 - Houd UI-state in de component.
+- **Blazor componenten gebruiken NOOIT direct `AppDbContext` of EF Core entities.**
+- Blazor componenten werken uitsluitend via service-interfaces (bijv. `IStudentService`).
+- Blazor componenten werken met DTO's, niet met entities.
 - Plaats geen businesslogica in de Blazor component.
 - Verplaats businesslogica naar services.
 - Houd markup overzichtelijk en leesbaar.
@@ -73,18 +106,34 @@ Copilot moet code voorstellen die:
 - Gebruik EF Core met SQLite als uitgangspunt.
 - Houd entities eenvoudig en expliciet.
 - Gebruik duidelijke relaties en properties.
+- **`AppDbContext` wordt alleen gebruikt in services, NOOIT in Blazor pagina's.**
+- Services gebruiken voorlopig direct `AppDbContext` via constructor injection.
+- **Repositories:** Een mogelijke latere architectuurstap, maar voeg ze in de huidige refactoring nog niet toe.
 - Bedenk niet zelfstandig migrations tenzij daar expliciet om gevraagd wordt.
 - Pas eerst entities en `DbContext` aan en stel daarna migrations voor.
 - Vermijd onnodige complexiteit in modelconfiguratie.
-- Gebruik EF Core direct waar passend; voeg geen repositorylaag toe.
 
 ## Services en interfaces
 
 - Gebruik services voor businesslogica en infrastructuurlogica.
+- **Definieer services altijd via interfaces** (bijv. `IStudentService` met implementatie `StudentService`).
+- Services bevatten alle businesslogica, queries, updates en validaties.
+- Services gebruiken `AppDbContext` direct via constructor injection.
+- **Services doen mapping tussen entities en DTO's.**
+- Services retourneren DTO's naar de UI, niet entities.
 - Interfaces en services moeten Nederlandse XML-documentatie bevatten.
 - Voeg comments toe waar nodig om niet-triviale logica te begrijpen.
 - Vermijd overbodige comments.
 - Documenteer vooral netwerkgedrag, Raspberry Pi-specifiek gedrag, en technische keuzes die niet direct duidelijk zijn.
+
+### DTO's
+
+- Gebruik Data Transfer Objects (DTO's) voor communicatie tussen UI en services.
+- DTO's zijn simpele classes met alleen properties.
+- DTO's bevatten geen businesslogica.
+- Plaats DTO's in een `DTOs` map.
+- Geef DTO's duidelijke namen die hun doel weergeven (bijv. `StudentDto`, `TestSessionDto`).
+- DTO's kunnen computed properties bevatten voor weergave (bijv. `IsActive`).
 
 ## Logging en foutafhandeling
 

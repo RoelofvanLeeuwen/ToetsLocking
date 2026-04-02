@@ -89,16 +89,18 @@ StudentWifiMonitoring.Web/
 
 **Verantwoordelijkheid:** UI rendering en user interaction handling
 
+**Architectuur:** Blazor pagina's werken via service-interfaces en DTO's. Directe toegang tot `AppDbContext` is niet toegestaan.
+
 #### Register.razor
 - Student registratiepagina
 - Vraagt naam van student
 - Bepaalt automatisch MAC-adres via `IMacResolver`
-- Slaat student op in database via `AppDbContext`
+- **Gebruik:** `IStudentService` voor registratie, werkt met DTO's
 - Gebruikt `@rendermode InteractiveServer` voor Blazor Server interactiviteit
 
 **Belangrijke implementatiedetails:**
 - Valideert naam server-side (geen lege strings)
-- Controleert of er een actieve toets is
+- Controleert of er een actieve toets is via service
 - Gebruikt `IHttpContextAccessor` voor client IP-adres
 - Logt alle belangrijke acties via `ILogger`
 
@@ -107,6 +109,7 @@ StudentWifiMonitoring.Web/
 - Toetsen aanmaken met starttijd en eindtijd
 - Lokale tijd invoer via `datetime-local` input
 - Converteert lokale tijd naar UTC voor opslag
+- **Gebruik:** `ITestSessionService` voor CRUD operaties, werkt met `TestSessionDto`
 
 **Belangrijke implementatiedetails:**
 - Valideert dat eindtijd na starttijd ligt
@@ -118,9 +121,10 @@ StudentWifiMonitoring.Web/
 - Real-time online/offline status
 - Filtering op toetssessie
 - SignalR client voor live updates
+- **Gebruik:** `IDashboardService` voor businesslogica, werkt met DTO's
 
 **Belangrijke implementatiedetails:**
-- Gebruikt `DashboardService` voor businesslogica
+- Gebruikt `IDashboardService` voor data ophalen
 - Luistert naar SignalR "status" events
 - Herlaadt data wanneer student online/offline gaat
 
@@ -340,16 +344,21 @@ public class StatusHub : Hub
 **Verantwoordelijkheid:**
 - User input verwerken
 - Data presenteren
-- Simpele validatie (null checks, required fields)
+- Simpele UI-state management
 - Services aanroepen voor businesslogica
+- Simpele validatie (null checks, required fields)
 
 **Mag NIET:**
 - Complexe businesslogica bevatten
-- Direct database queries uitvoeren (gebruik services)
+- **Direct `AppDbContext` of EF Core entities gebruiken**
 - Platform-specifieke code bevatten
 - Configuratie-logica bevatten
 
-**Voorbeeld goed:**
+**Gebruik:**
+- Services via interfaces (bijv. `IStudentService`, `ITestSessionService`)
+- DTO's voor data transport tussen UI en services
+
+**Voorbeeld goed (huidige implementatie):**
 ```csharp
 // Register.razor
 var macAddress = MacResolver.GetMacForIp(clientIp);
@@ -373,14 +382,24 @@ if (Environment.IsDevelopment() && Configuration["EnableMock"] == "true")
 **Verantwoordelijkheid:**
 - Businesslogica implementeren
 - Data transformaties
-- Database queries via EF Core
+- **Mapping tussen domain entities en DTO's**
+- Database queries via EF Core (in deze fase direct via `AppDbContext`)
 - Externe systemen aanroepen (shell commands)
 - Configuratie-logica
+
+**Gebruik:**
+- Services worden gedefinieerd via interfaces
+- Services gebruiken `AppDbContext` direct via constructor injection
+- Services retourneren DTO's naar de UI, niet entities
 
 **Voorbeelden:**
 - `DashboardService` - Dashboard-specifieke queries en filtering
 - `MonitoringService` - Monitoring loop en event detectie
 - `DevelopmentMacResolverDecorator` - Development-specifieke infrastructuur logica
+
+**Gewenste structuur (voor refactoring):**
+- `IStudentService` + `StudentService` - Student-gerelateerde businesslogica
+- `ITestSessionService` + `TestSessionService` - Toetssessie-gerelateerde businesslogica
 
 ### Data Laag (AppDbContext + Domain)
 **Verantwoordelijkheid:**
@@ -389,13 +408,198 @@ if (Environment.IsDevelopment() && Configuration["EnableMock"] == "true")
 - Type conversies (ValueConverters)
 - Constraints en indexes
 
+**Gebruik:**
+- **`AppDbContext` wordt alleen gebruikt door services, niet door Blazor pagina's**
+- Entities worden alleen binnen de service-laag gebruikt
+
 **Mag NIET:**
 - Businesslogica bevatten
 - Services aanroepen
 
 ---
 
-## 6. Waarom Businesslogica niet in Blazor Componenten Hoort
+## 6. Gewenste Doelstructuur voor Komende Refactorstappen
+
+### Huidige Tussenfase: Services met Interfaces en DTO's
+
+De applicatie gebruikt een duidelijke scheiding tussen UI, services en data:
+
+1. **Blazor pagina's gebruiken nooit direct `AppDbContext`**
+2. **Services met interfaces bevatten alle businesslogica**
+3. **DTO's worden gebruikt voor communicatie tussen UI en services**
+4. **Services gebruiken voorlopig direct EF Core en `AppDbContext`**
+
+### Mogelijke Vervolgstap: Repository Pattern
+
+Op termijn kan een repository laag toegevoegd worden tussen services en `AppDbContext`:
+- Repositories abstraheren data toegang
+- Services gebruiken dan repositories in plaats van direct `AppDbContext`
+- Dit maakt testen en database-onafhankelijkheid eenvoudiger
+
+**Belangrijk:** Deze stap maken we **nu nog niet**. De huidige tussenfase met services is voldoende en pragmatisch.
+
+#### Lagen in de huidige tussenstructuur
+
+```
+┌─────────────────────────────────────┐
+│   Blazor Pages (UI)                 │
+│   - Register.razor                  │
+│   - Tests.razor                     │
+│   - Dashboard.razor                 │
+│   Gebruikt: Service interfaces      │
+│   Werkt met: DTO's                  │
+└─────────────────────────────────────┘
+              ↓ ↑ DTO's
+┌─────────────────────────────────────┐
+│   Services + Interfaces             │
+│   - IStudentService                 │
+│   - ITestSessionService             │
+│   - StudentService                  │
+│   - TestSessionService              │
+│   Bevat: Businesslogica, mapping    │
+│   Gebruikt: AppDbContext (direct)   │
+└─────────────────────────────────────┘
+              ↓ ↑ Entities
+┌─────────────────────────────────────┐
+│   Data + Domain                     │
+│   - AppDbContext                    │
+│   - Domain entities                 │
+└─────────────────────────────────────┘
+```
+
+**Mogelijke vervolgstap (nu nog niet):**
+Een repository laag kan later toegevoegd worden tussen Services en Data, waardoor services repositories gebruiken in plaats van direct `AppDbContext`.
+
+#### Voorbeeld: Register Flow
+
+**Implementatie met services en DTO's:**
+```csharp
+// Register.razor - gebruikt service interface
+@inject IStudentService StudentService
+
+private async Task RegisterAsync()
+{
+    var result = await StudentService.RegisterStudentAsync(studentName, macAddress, testSessionId);
+    if (result.Success)
+    {
+        // Success handling
+    }
+    else
+    {
+        _errorMessage = result.ErrorMessage;
+    }
+}
+
+// StudentService.cs - bevat businesslogica
+public class StudentService : IStudentService
+{
+    private readonly AppDbContext _context;
+
+    public async Task<RegistrationResultDto> RegisterStudentAsync(string name, string macAddress, int testSessionId)
+    {
+        // Validation
+        if (string.IsNullOrWhiteSpace(name))
+            return new RegistrationResultDto { Success = false, ErrorMessage = "Naam is verplicht" };
+
+        // Check duplicate
+        var exists = await _context.Students.AnyAsync(s => s.MacAddress == macAddress);
+        if (exists)
+            return new RegistrationResultDto { Success = false, ErrorMessage = "Apparaat is al geregistreerd" };
+
+        // Create entity
+        var student = new Student { Name = name, MacAddress = macAddress, TestSessionId = testSessionId };
+        _context.Students.Add(student);
+        await _context.SaveChangesAsync();
+
+        // Map naar DTO
+        return new RegistrationResultDto 
+        { 
+            Success = true, 
+            StudentId = student.Id,
+            Student = new StudentDto 
+            { 
+                Id = student.Id, 
+                Name = student.Name, 
+                MacAddress = student.MacAddress 
+            }
+        };
+    }
+}
+```
+
+#### DTOs (Data Transfer Objects)
+
+DTO's zijn simpele klassen voor data transport tussen UI en services:
+
+```csharp
+// DTOs/StudentDto.cs
+public class StudentDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; }
+    public string MacAddress { get; set; }
+    public bool IsOnline { get; set; }  // Computed in service
+}
+
+// DTOs/TestSessionDto.cs
+public class TestSessionDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; }
+    public DateTime StartTime { get; set; }
+    public DateTime EndTime { get; set; }
+    public bool IsActive { get; set; }  // Computed in service
+}
+
+// DTOs/RegistrationResultDto.cs
+public class RegistrationResultDto
+{
+    public bool Success { get; set; }
+    public int? StudentId { get; set; }
+    public string? ErrorMessage { get; set; }
+}
+```
+
+### Implementatie Aanpak
+
+**Stapsgewijze implementatie per functioneel gebied:**
+
+1. **Student registratie**
+   - Implementeer `IStudentService` + `StudentService`
+   - Maak benodigde DTO's (`StudentDto`, `RegistrationResultDto`)
+   - Implementeer `Register.razor` met service
+
+2. **Toetssessie beheer**
+   - Implementeer `ITestSessionService` + `TestSessionService`
+   - Maak benodigde DTO's (`TestSessionDto`)
+   - Implementeer `Tests.razor` met service
+
+3. **Dashboard**
+   - Implementeer `IDashboardService` interface voor bestaande `DashboardService`
+   - Introduceer DTO's voor dashboard data
+   - Update `Dashboard.razor` om met DTO's te werken
+
+4. **Validatie en testen**
+   - Test alle functionaliteit na elke stap
+   - Verifieer dat gedrag correct werkt
+
+### Wat NIET in de huidige implementatie
+
+- **Geen repository pattern** - Services gebruiken voorlopig direct `AppDbContext`. Repositories zijn een mogelijke vervolgstap.
+- **Geen nieuwe projectlagen** - Gebruik bestaande mappen (`Services`, `DTOs`, `Domain`, `Data`)
+- **Geen wijzigingen aan werkende background services** - `MonitoringService` blijft zoals het is
+
+### Voordelen van deze structuur
+
+1. **Testbaarheid** - Services zijn makkelijk te unit testen
+2. **Herbruikbaarheid** - Businesslogica kan hergebruikt worden door andere consumers (API, background jobs)
+3. **Scheiding van verantwoordelijkheden** - UI doet UI, services doen businesslogica
+4. **Onderhoudbaarheid** - Logica is geïsoleerd en makkelijker te wijzigen
+5. **Toekomstbestendig** - Eenvoudig uit te breiden met repository pattern als dat later nodig is
+
+---
+
+## 7. Waarom Businesslogica niet in Blazor Componenten Hoort
 
 ### Redenen
 
@@ -476,7 +680,7 @@ Als MAC-resolutie logica in `Register.razor` zou zitten, moest het gedupliceerd 
 
 ---
 
-## 7. Waarom Development Fallback in Lager Architectuurniveau Staat
+## 8. Waarom Development Fallback in Lager Architectuurniveau Staat
 
 ### Probleem
 Op localhost (::1 of 127.0.0.1) staat het client MAC-adres niet in de ARP/neighbor table. Dit maakt lokale ontwikkeling onmogelijk zonder infrastructuur-aanpassingen.
