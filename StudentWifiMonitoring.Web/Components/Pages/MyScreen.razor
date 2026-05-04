@@ -1,11 +1,10 @@
 ﻿@page "/myscreen"
 @using Microsoft.AspNetCore.SignalR.Client
-@using StudentWifiMonitoring.Web.Data
-@using StudentWifiMonitoring.Web.Domain
+@using StudentWifiMonitoring.Web.DTOs.MyScreen
 @using StudentWifiMonitoring.Web.Services
-@using Microsoft.EntityFrameworkCore
+@using StudentWifiMonitoring.Web.Services.Interfaces
 @rendermode InteractiveServer
-@inject AppDbContext DbContext
+@inject IMyScreenService MyScreenService
 @inject IMacResolver MacResolver
 @inject IHttpContextAccessor HttpContextAccessor
 @inject NavigationManager Nav
@@ -126,7 +125,7 @@ else
     <div class="fullscreen-status status-disconnected">
         <div class="status-icon">❌</div>
         <div class="status-title">Niet Verbonden</div>
-        @if (_student != null)
+        @if (_status?.IsRegistered == true)
         {
             <div class="status-message">Je bent geregistreerd maar niet verbonden</div>
             <div class="status-details">
@@ -154,7 +153,7 @@ else
     private string? QueryMac { get; set; }
 
     private string? _macAddress;
-    private Student? _student;
+    private StudentConnectionStatusDto? _status;
     private bool _isConnected;
     private bool _isLoading = true;
     private string? _errorMessage;
@@ -222,7 +221,7 @@ else
     }
 
     /// <summary>
-    /// Laadt de student en bepaalt de verbindingsstatus.
+    /// Laadt de student en bepaalt de verbindingsstatus via de service.
     /// </summary>
     private async Task LoadStudentStatusAsync()
     {
@@ -231,25 +230,10 @@ else
             return;
         }
 
-        // Zoek student in database
-        _student = await DbContext.Students
-            .FirstOrDefaultAsync(s => s.MacAddress == _macAddress);
-
-        if (_student == null)
-        {
-            _isConnected = false;
-            return;
-        }
-
-        // Bepaal of student momenteel verbonden is
-        var openConnection = await DbContext.Connections
-            .Where(c => c.StudentId == _student.Id && c.DisconnectedAt == null)
-            .OrderByDescending(c => c.ConnectedAt)
-            .FirstOrDefaultAsync();
-
-        _isConnected = openConnection != null;
-        _studentName = _student.Name;
-        _testName = _student.TestName;
+        _status = await MyScreenService.GetStudentConnectionStatusAsync(_macAddress);
+        _isConnected = _status.IsConnected;
+        _studentName = _status.Name;
+        _testName = _status.TestName;
     }
 
     /// <summary>
@@ -339,7 +323,7 @@ else
                 }
 
                 // Als student nog niet bekend was, laad deze nu
-                if (_student == null && !string.IsNullOrEmpty(payload.Name))
+                if (_status?.IsRegistered != true && !string.IsNullOrEmpty(payload.Name))
                 {
                     await LoadStudentStatusAsync();
                 }
