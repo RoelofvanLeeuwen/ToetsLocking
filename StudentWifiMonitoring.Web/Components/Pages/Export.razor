@@ -4,9 +4,11 @@
 @inject IExportService ExportService
 @inject IJSRuntime JS
 
+<TeacherGuard>
 <h3>Export Events (Alles)</h3>
 <button @onclick="ExportAll">Download CSV</button>
 <p>@message</p>
+</TeacherGuard>
 
 @code {
     private string? message;

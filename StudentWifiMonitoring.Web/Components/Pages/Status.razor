@@ -4,6 +4,7 @@
 @inject IStatusService StatusService
 @implements IAsyncDisposable
 
+<TeacherGuard>
 <h3>Connected Students</h3>
 
 @if (connected == null)
@@ -19,6 +20,7 @@ else
         }
     </ul>
 }
+</TeacherGuard>
 
 @code {
     private List<ConnectedStudentDto>? connected;

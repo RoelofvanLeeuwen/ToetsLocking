@@ -5,6 +5,9 @@ using StudentWifiMonitoring.Web.Hubs;
 using StudentWifiMonitoring.Web.Services;
 using StudentWifiMonitoring.Web.Services.Interfaces;
 
+// TeacherAuthService.CookieName en CookieValue zijn internal const en worden gebruikt
+// in de login/logout endpoints hieronder.
+
 namespace StudentWifiMonitoring.Web;
 
 public class Program
@@ -27,6 +30,7 @@ public class Program
         builder.Services.AddScoped<IMyScreenService, MyScreenService>();
         builder.Services.AddScoped<IExportService, ExportService>();
         builder.Services.AddScoped<IDevStationsService, DevStationsService>();
+        builder.Services.AddScoped<ITeacherAuthService, TeacherAuthService>();
 
         builder.Services.AddSignalR();
         builder.Services.AddHostedService<MonitoringService>();
@@ -92,6 +96,35 @@ public class Program
            .AddInteractiveServerRenderMode();
 
         app.MapHub<StatusHub>("/hubs/status");
+
+        // HTTP POST-endpoint voor docent-login.
+        // Verwerkt de pincode vóór het verzenden van de response zodat het cookie correct gezet kan worden.
+        app.MapPost("/api/teacher/login", (HttpContext httpContext, IConfiguration configuration) =>
+        {
+            var configuredPassword = configuration["Teacher:Password"] ?? string.Empty;
+            var pin = httpContext.Request.Form["pin"].ToString();
+
+            if (!string.IsNullOrEmpty(configuredPassword) && pin == configuredPassword)
+            {
+                httpContext.Response.Cookies.Append(TeacherAuthService.CookieName, TeacherAuthService.CookieValue, new CookieOptions
+                {
+                    HttpOnly = true,
+                    IsEssential = true,
+                    SameSite = SameSiteMode.Strict,
+                    Secure = false // Zet op true als alleen HTTPS gewenst is
+                });
+                return Results.Redirect("/teacher");
+            }
+
+            return Results.Redirect("/teacher?fout=1");
+        });
+
+        // HTTP POST-endpoint voor docent-logout.
+        app.MapPost("/api/teacher/logout", (HttpContext httpContext) =>
+        {
+            httpContext.Response.Cookies.Delete(TeacherAuthService.CookieName);
+            return Results.Redirect("/teacher");
+        });
 
         app.Run();
     }

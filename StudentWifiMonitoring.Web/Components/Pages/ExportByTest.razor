@@ -5,6 +5,7 @@
 @inject IExportService ExportService
 @inject IJSRuntime JS
 
+<TeacherGuard>
 <h3>Export per Toets</h3>
 
 <select @bind-Value="selectedTestId" @bind-Value:event="onchange">
@@ -16,6 +17,7 @@
 </select>
 <button @onclick="Export">Download CSV</button>
 <p>@message</p>
+</TeacherGuard>
 
 @code {
     private List<TestSessionDto> tests = new();

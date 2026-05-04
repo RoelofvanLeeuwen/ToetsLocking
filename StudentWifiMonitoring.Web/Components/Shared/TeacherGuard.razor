@@ -1,0 +1,25 @@
+@using StudentWifiMonitoring.Web.Services.Interfaces
+@inject ITeacherAuthService TeacherAuth
+@inject NavigationManager Nav
+
+@if (_isTeacher)
+{
+    @ChildContent
+}
+
+@code {
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private bool _isTeacher;
+
+    protected override void OnInitialized()
+    {
+        _isTeacher = TeacherAuth.IsTeacher();
+
+        if (!_isTeacher)
+        {
+            Nav.NavigateTo("/teacher", replace: true);
+        }
+    }
+}

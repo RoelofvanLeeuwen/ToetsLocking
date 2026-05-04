@@ -6,16 +6,14 @@
 @inject IStationProvider StationProvider
 @inject IDevStationsService DevStationsService
 @inject IWebHostEnvironment Environment
+@inject NavigationManager Nav
 
 <PageTitle>Development: Mock Stations</PageTitle>
 
 <div class="container mt-4">
     @if (!Environment.IsDevelopment())
     {
-        <div class="alert alert-danger">
-            <h4>⚠️ Productie Omgeving</h4>
-            <p>Deze pagina is alleen beschikbaar in development mode.</p>
-        </div>
+        Nav.NavigateTo("/", replace: true);
         return;
     }
 

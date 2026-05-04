@@ -1,0 +1,70 @@
+@page "/teacher"
+@using StudentWifiMonitoring.Web.Services.Interfaces
+@rendermode InteractiveServer
+@inject ITeacherAuthService TeacherAuth
+@inject NavigationManager Nav
+
+<PageTitle>Docent inloggen</PageTitle>
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h4 class="mb-0">🔒 Docent inloggen</h4>
+                </div>
+                <div class="card-body">
+                    @if (_isLoggedIn)
+                    {
+                        <div class="alert alert-success">
+                            <strong>Ingelogd als docent.</strong>
+                        </div>
+                        <a href="/" class="btn btn-primary w-100">Naar dashboard</a>
+
+                        @* Logout verloopt via een echte HTTP POST zodat het cookie verwijderd kan worden *@
+                        <form method="post" action="/api/teacher/logout" class="mt-2">
+                            <button type="submit" class="btn btn-outline-secondary w-100">Uitloggen</button>
+                        </form>
+                    }
+                    else
+                    {
+                        <p class="text-muted small">Voer de docentpincode in om beheerfunctionaliteit te openen.</p>
+
+                        @if (_loginFailed)
+                        {
+                            <div class="alert alert-danger">Pincode onjuist. Probeer opnieuw.</div>
+                        }
+
+                        @* Login verloopt via een echte HTTP POST zodat het cookie vóór de response gezet kan worden.
+                           Blazor session writes zijn niet mogelijk nadat de response gestart is. *@
+                        <form method="post" action="/api/teacher/login">
+                            <div class="mb-3">
+                                <label class="form-label">Pincode</label>
+                                <input type="password"
+                                       name="pin"
+                                       class="form-control"
+                                       placeholder="Voer pincode in"
+                                       autofocus />
+                            </div>
+                            <button type="submit" class="btn btn-dark w-100">Inloggen</button>
+                        </form>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool _loginFailed;
+    private bool _isLoggedIn;
+
+    protected override void OnInitialized()
+    {
+        _isLoggedIn = TeacherAuth.IsTeacher();
+
+        // Toon foutmelding als de login mislukt is (teruggestuurd door het login-endpoint)
+        var uri = new Uri(Nav.Uri);
+        _loginFailed = System.Web.HttpUtility.ParseQueryString(uri.Query)["fout"] == "1";
+    }
+}
