@@ -1,12 +1,9 @@
 ﻿@page "/register"
 @rendermode InteractiveServer
-@using Microsoft.EntityFrameworkCore
-@using StudentWifiMonitoring.Web.Data
-@using StudentWifiMonitoring.Web.Domain
-@using StudentWifiMonitoring.Web.Services
-@inject AppDbContext DbContext
+@using StudentWifiMonitoring.Web.DTOs.Students
+@using StudentWifiMonitoring.Web.Services.Interfaces
+@inject IStudentRegistrationService RegistrationService
 @inject IHttpContextAccessor HttpContextAccessor
-@inject IMacResolver MacResolver
 @inject ILogger<Register> Logger
 
 <PageTitle>Registreren</PageTitle>
@@ -73,7 +70,7 @@
 </div>
 
 @code {
-    private TestSession? _activeSession;
+    private ActiveTestSessionDto? _activeSession;
     private string _studentName = string.Empty;
     private string _errorMessage = string.Empty;
     private string _successMessage = string.Empty;
@@ -85,20 +82,16 @@
     }
 
     /// <summary>
-    /// Laadt de huidige actieve toetssessie op basis van UTC-tijden.
+    /// Laadt de huidige actieve toetssessie via de service.
     /// </summary>
     private async Task LoadActiveSessionAsync()
     {
-        var now = DateTime.UtcNow;
-        _activeSession = await DbContext.TestSessions
-            .Where(ts => ts.StartTime <= now && ts.EndTime >= now)
-            .OrderBy(ts => ts.StartTime)
-            .FirstOrDefaultAsync();
+        _activeSession = await RegistrationService.GetActiveTestSessionAsync();
     }
 
     /// <summary>
-    /// Registreert de student voor de actieve toets.
-    /// Bepaalt automatisch het MAC-adres op basis van het client IP-adres.
+    /// Registreert de student voor de actieve toets via de service.
+    /// Verzamelt het client IP-adres en geeft dit door aan de service.
     /// </summary>
     private async Task RegisterAsync()
     {
@@ -108,7 +101,7 @@
 
         try
         {
-            // Valideer naam
+            // Valideer naam (eerste check in UI voor snelle feedback)
             if (string.IsNullOrWhiteSpace(_studentName))
             {
                 _errorMessage = "Voer een geldige naam in.";
@@ -122,7 +115,7 @@
                 return;
             }
 
-            // Bepaal client IP-adres
+            // Bepaal client IP-adres (praktisch om hier te doen vanwege HttpContext toegang)
             var httpContext = HttpContextAccessor.HttpContext;
             if (httpContext?.Connection?.RemoteIpAddress == null)
             {
@@ -133,45 +126,24 @@
 
             var clientIp = httpContext.Connection.RemoteIpAddress.ToString();
 
-            // Bepaal MAC-adres via resolver
-            var macAddress = MacResolver.GetMacForIp(clientIp);
-            if (string.IsNullOrEmpty(macAddress))
+            // Registreer via service
+            var request = new StudentRegistrationRequestDto
             {
-                Logger.LogWarning("Kan MAC-adres niet bepalen voor IP {ClientIp}", clientIp);
-                _errorMessage = "Kan je apparaat niet identificeren. Zorg dat je verbonden bent met het juiste WiFi-netwerk.";
-                return;
-            }
+                StudentName = _studentName,
+                ClientIpAddress = clientIp
+            };
 
-            // Zoek of update bestaande student
-            var existingStudent = await DbContext.Students
-                .FirstOrDefaultAsync(s => s.MacAddress == macAddress);
+            var result = await RegistrationService.RegisterStudentAsync(request);
 
-            if (existingStudent == null)
+            if (result.Success)
             {
-                // Nieuwe student toevoegen
-                var newStudent = new Student
-                {
-                    Name = _studentName.Trim(),
-                    TestName = _activeSession.Name,
-                    MacAddress = macAddress
-                };
-                DbContext.Students.Add(newStudent);
-                Logger.LogInformation("Nieuwe student geregistreerd: {StudentName} voor toets {TestName}", 
-                    newStudent.Name, _activeSession.Name);
+                _successMessage = result.SuccessMessage ?? "Registratie succesvol.";
+                _studentName = string.Empty; // Reset form
             }
             else
             {
-                // Bestaande student updaten
-                existingStudent.Name = _studentName.Trim();
-                existingStudent.TestName = _activeSession.Name;
-                Logger.LogInformation("Bestaande student bijgewerkt: {StudentName} voor toets {TestName}", 
-                    existingStudent.Name, _activeSession.Name);
+                _errorMessage = result.ErrorMessage ?? "Er is een fout opgetreden.";
             }
-
-            await DbContext.SaveChangesAsync();
-
-            _successMessage = $"Je bent succesvol geregistreerd voor '{_activeSession.Name}'. Je apparaat wordt nu gemonitord.";
-            _studentName = string.Empty;
         }
         catch (Exception ex)
         {

@@ -1,9 +1,10 @@
 ﻿@page "/"
 @using Microsoft.AspNetCore.SignalR.Client
-@using StudentWifiMonitoring.Web.Domain
-@using StudentWifiMonitoring.Web.Services
+@using StudentWifiMonitoring.Web.DTOs.Dashboard
+@using StudentWifiMonitoring.Web.DTOs.Tests
+@using StudentWifiMonitoring.Web.Services.Interfaces
 @rendermode InteractiveServer
-@inject DashboardService DashboardService
+@inject IDashboardService DashboardService
 @inject NavigationManager Nav
 @implements IAsyncDisposable
 
@@ -20,7 +21,7 @@
                 <label class="form-label">Selecteer Toets:</label>
                 <select class="form-select" @bind="selectedTestId" @bind:after="OnTestChanged">
                     <option value="">-- Alle toetsen --</option>
-                    @foreach (var t in tests)
+                    @foreach (TestSessionDto t in tests)
                     {
                         <option value="@t.Id">@t.Name (@t.StartTime.ToLocalTime():HH:mm) - (@t.EndTime.ToLocalTime():HH:mm))</option>
                     }
@@ -73,35 +74,34 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (var s in students.OrderBy(st => st.Name))
-                            {
-                                var isOnline = onlineMacs.Contains(s.MacAddress);
-                                <tr class="@(isOnline ? "table-success" : "")">
-                                    <td>
-                                        @if (isOnline)
-                                        {
-                                            <span class="badge bg-success">🟢 Verbonden</span>
-                                        }
-                                        else
-                                        {
-                                            <span class="badge bg-secondary">⚪ Niet verbonden</span>
-                                        }
-                                    </td>
-                                    <td><strong>@s.Name</strong></td>
-                                    <td>@s.TestName</td>
-                                    <td><code class="small">@s.MacAddress</code></td>
-                                </tr>
-                            }
+                            @foreach (StudentStatusDto s in students.OrderBy(st => st.Name))
+                                {
+                                    <tr class="@(s.IsOnline ? "table-success" : "")">
+                                        <td>
+                                            @if (s.IsOnline)
+                                            {
+                                                <span class="badge bg-success">🟢 Verbonden</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary">⚪ Niet verbonden</span>
+                                            }
+                                        </td>
+                                        <td><strong>@s.Name</strong></td>
+                                        <td>@s.TestName</td>
+                                        <td><code class="small">@s.MacAddress</code></td>
+                                    </tr>
+                                }
                         </tbody>
                     </table>
                 </div>
 
                 <div class="mt-3">
                     <small class="text-muted">
-                        <strong>Totaal:</strong> @students.Count student(en) | 
-                        <strong class="text-success">Verbonden:</strong> @onlineMacs.Count | 
-                        <strong class="text-secondary">Niet verbonden:</strong> @(students.Count - onlineMacs.Count)
-                    </small>
+                            <strong>Totaal:</strong> @students.Count student(en) | 
+                            <strong class="text-success">Verbonden:</strong> @students.Count(s => s.IsOnline) | 
+                            <strong class="text-secondary">Niet verbonden:</strong> @students.Count(s => !s.IsOnline)
+                        </small>
                 </div>
             }
         </div>
@@ -109,9 +109,8 @@
 </div>
 
 @code {
-    private List<Student>? students;
-    private HashSet<string> onlineMacs = new();
-    private List<TestSession> tests = new();
+    private List<StudentStatusDto>? students;
+    private List<TestSessionDto> tests = new();
     private int? selectedTestId;
     private HubConnection? hubConnection;
     private string? _connectionStatus;
@@ -196,24 +195,16 @@
                 return;
             }
 
-            // Update online status
-            if (payload.Status == "connected")
-            {
-                onlineMacs.Add(payload.Mac);
-            }
-            else if (payload.Status == "disconnected")
-            {
-                onlineMacs.Remove(payload.Mac);
-            }
-
             // Controleer of student al bestaat in lijst
             if (students != null)
             {
-                var existingStudent = students.FirstOrDefault(s => s.MacAddress == payload.Mac);
+                StudentStatusDto? existingStudent = students.FirstOrDefault(s => s.MacAddress == payload.Mac);
 
                 if (existingStudent != null)
                 {
-                    // Update bestaande student als naam of toets gewijzigd is
+                    // Update online status en gegevens als deze gewijzigd zijn
+                    existingStudent.IsOnline = payload.Status == "connected";
+
                     if (!string.IsNullOrEmpty(payload.Name) && existingStudent.Name != payload.Name)
                     {
                         existingStudent.Name = payload.Name;
@@ -226,13 +217,13 @@
                 else if (!string.IsNullOrEmpty(payload.Name))
                 {
                     // Voeg nieuwe student toe aan lijst
-                    var newStudent = new Student
+                    students.Add(new StudentStatusDto
                     {
                         MacAddress = payload.Mac,
                         Name = payload.Name,
-                        TestName = payload.TestName ?? "Onbekend"
-                    };
-                    students.Add(newStudent);
+                        TestName = payload.TestName ?? "Onbekend",
+                        IsOnline = payload.Status == "connected"
+                    });
                 }
             }
 
@@ -251,7 +242,7 @@
     /// </summary>
     private void LoadStudents()
     {
-        (students, onlineMacs) = DashboardService.GetStudentsWithStatus(selectedTestId);
+        students = DashboardService.GetStudentsWithStatus(selectedTestId);
     }
 
     /// <summary>

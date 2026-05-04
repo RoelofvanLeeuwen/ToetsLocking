@@ -20,8 +20,9 @@ public class Program
 
         builder.Services.AddHttpContextAccessor();
 
-        builder.Services.AddScoped<DashboardService>();
+        builder.Services.AddScoped<IDashboardService, DashboardService>();
         builder.Services.AddScoped<ITestManagementService, TestManagementService>();
+        builder.Services.AddScoped<IStudentRegistrationService, StudentRegistrationService>();
 
         builder.Services.AddSignalR();
         builder.Services.AddHostedService<MonitoringService>();

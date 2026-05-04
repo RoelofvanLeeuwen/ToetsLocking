@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\r.vanleeuwen\\\\source\\\\repos\\\\ToetsLocking\" -Recurse -Force)",
+      "Bash(Select-Object -Property FullName, PSIsContainer)",
+      "Bash(Sort-Object FullName)",
+      "Bash(Format-Table -AutoSize)",
+      "PowerShell(cd \"C:\\\\Users\\\\r.vanleeuwen\\\\source\\\\repos\\\\ToetsLocking\" && Get-ChildItem -Path . -Force | ForEach-Object { $_.FullName })"
+    ]
+  }
+}
