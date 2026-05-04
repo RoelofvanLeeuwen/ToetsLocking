@@ -1,14 +1,14 @@
 ﻿@page "/export-by-test"
-@using Microsoft.EntityFrameworkCore
-@using StudentWifiMonitoring.Web.Data
-@using StudentWifiMonitoring.Web.Domain
-@inject AppDbContext Db
+@using StudentWifiMonitoring.Web.DTOs.Export
+@using StudentWifiMonitoring.Web.DTOs.Tests
+@using StudentWifiMonitoring.Web.Services.Interfaces
+@inject IExportService ExportService
 
 <h3>Export per Toets</h3>
 
 <select @bind-Value="selectedTestId" @bind-Value:event="onchange">
     <option value="">-- Kies toets --</option>
-    @foreach (var t in tests)
+    @foreach (TestSessionDto t in tests)
     {
         <option value="@t.Id">@t.Name (@t.StartTime.ToLocalTime() - @t.EndTime.ToLocalTime())</option>
     }
@@ -17,21 +17,22 @@
 <p>@message</p>
 
 @code {
-    private List<TestSession> tests = new();
+    private List<TestSessionDto> tests = new();
     private int? selectedTestId;
     private string? message;
 
     protected override void OnInitialized()
     {
-        tests = Db.TestSessions.OrderByDescending(t => t.StartTime).ToList();
+        tests = ExportService.GetTestSessions();
     }
 
     private async Task Export()
     {
         if (selectedTestId == null) { message = "Geen toets geselecteerd."; return; }
-        var csv = await StudentWifiMonitoring.Web.Services.CsvExporter.ExportByTestAsync(Db, selectedTestId.Value);
-        var fileName = $"events-test-{selectedTestId}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.csv";
-        await File.WriteAllTextAsync(fileName, csv);
-        message = $"Export opgeslagen als {fileName}";
+
+        ExportResultDto result = await ExportService.ExportByTestAsync(selectedTestId.Value);
+        message = result.Success
+            ? $"Export opgeslagen als {result.FileName}"
+            : result.ErrorMessage;
     }
 }
