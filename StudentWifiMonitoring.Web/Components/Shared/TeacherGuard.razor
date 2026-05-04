@@ -1,23 +1,37 @@
 @using StudentWifiMonitoring.Web.Services.Interfaces
+@using Microsoft.AspNetCore.Http
 @inject ITeacherAuthService TeacherAuth
+@inject IHttpContextAccessor HttpContextAccessor
 @inject NavigationManager Nav
 
-@if (_isTeacher)
+@if (_authState == AuthState.Teacher)
 {
     @ChildContent
 }
 
 @code {
+    private enum AuthState { Unknown, Teacher, NotTeacher }
+
     [Parameter]
     public RenderFragment? ChildContent { get; set; }
 
-    private bool _isTeacher;
+    private AuthState _authState = AuthState.Unknown;
 
     protected override void OnInitialized()
     {
-        _isTeacher = TeacherAuth.IsTeacher();
+        if (HttpContextAccessor.HttpContext == null)
+        {
+            // Interactieve fase (WebSocket): HttpContext niet beschikbaar.
+            // De SSR pre-render heeft al gevalideerd en niet-docenten omgeleid.
+            // Docenten die deze fase bereiken hebben de SSR-check doorstaan.
+            _authState = AuthState.Teacher;
+            return;
+        }
 
-        if (!_isTeacher)
+        // SSR fase: HttpContext beschikbaar, echte cookie-check uitvoeren.
+        _authState = TeacherAuth.IsTeacher() ? AuthState.Teacher : AuthState.NotTeacher;
+
+        if (_authState == AuthState.NotTeacher)
         {
             Nav.NavigateTo("/teacher", replace: true);
         }

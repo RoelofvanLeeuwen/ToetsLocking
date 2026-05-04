@@ -2,9 +2,21 @@
 @using StudentWifiMonitoring.Web.DTOs.Status
 @using StudentWifiMonitoring.Web.Services.Interfaces
 @inject IStatusService StatusService
+@inject ITeacherAuthService TeacherAuth
+@inject PersistentComponentState AppState
 @implements IAsyncDisposable
 
-<TeacherGuard>
+@if (!isTeacher)
+{
+    <div class="container mt-4">
+        <div class="alert alert-warning mt-5">
+            <h4 class="alert-heading">🔒 Geen toegang</h4>
+            <p class="mb-0">Deze pagina is alleen beschikbaar voor docenten.</p>
+        </div>
+    </div>
+}
+else
+{
 <h3>Connected Students</h3>
 
 @if (connected == null)
@@ -20,20 +32,44 @@ else
         }
     </ul>
 }
-</TeacherGuard>
+}
 
 @code {
+    private bool isTeacher;
+    private PersistingComponentStateSubscription _persistSubscription;
     private List<ConnectedStudentDto>? connected;
     private PeriodicTimer? timer;
     private CancellationTokenSource? cts;
 
     protected override async Task OnInitializedAsync()
     {
+        _persistSubscription = AppState.RegisterOnPersisting(PersistAuthState);
+
+        if (AppState.TryTakeFromJson<bool>("isTeacher", out bool restored))
+        {
+            isTeacher = restored;
+        }
+        else
+        {
+            isTeacher = TeacherAuth.IsTeacher();
+        }
+
+        if (!isTeacher)
+        {
+            return;
+        }
+
         await RefreshAsync();
 
         cts = new CancellationTokenSource();
         timer = new PeriodicTimer(TimeSpan.FromSeconds(3));
         _ = PollAsync(cts.Token);
+    }
+
+    private Task PersistAuthState()
+    {
+        AppState.PersistAsJson("isTeacher", isTeacher);
+        return Task.CompletedTask;
     }
 
     private Task RefreshAsync()
@@ -59,6 +95,7 @@ else
     {
         try
         {
+            _persistSubscription.Dispose();
             cts?.Cancel();
             timer?.Dispose();
         }

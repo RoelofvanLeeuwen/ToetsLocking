@@ -11,12 +11,6 @@
 <PageTitle>Development: Mock Stations</PageTitle>
 
 <div class="container mt-4">
-    @if (!Environment.IsDevelopment())
-    {
-        Nav.NavigateTo("/", replace: true);
-        return;
-    }
-
     <div class="row">
         <div class="col-md-8">
             <div class="card">
@@ -206,6 +200,12 @@
 
     protected override async Task OnInitializedAsync()
     {
+        if (!Environment.IsDevelopment())
+        {
+            Nav.NavigateTo("/", replace: true);
+            return;
+        }
+
         await LoadStationsAsync();
         await LoadActiveTestSessionAsync();
     }

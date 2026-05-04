@@ -5,12 +5,24 @@
 @using StudentWifiMonitoring.Web.Services.Interfaces
 @rendermode InteractiveServer
 @inject IDashboardService DashboardService
+@inject ITeacherAuthService TeacherAuth
+@inject PersistentComponentState AppState
 @inject NavigationManager Nav
 @implements IAsyncDisposable
 
 <PageTitle>Docent Dashboard</PageTitle>
 
-<TeacherGuard>
+@if (!isTeacher)
+{
+    <div class="container mt-4">
+        <div class="alert alert-warning mt-5">
+            <h4 class="alert-heading">🔒 Geen toegang</h4>
+            <p class="mb-0">Deze pagina is alleen beschikbaar voor docenten.</p>
+        </div>
+    </div>
+}
+else
+{
 <div class="container mt-4">
     <div class="card">
         <div class="card-header bg-primary text-white">
@@ -108,9 +120,11 @@
         </div>
     </div>
 </div>
-</TeacherGuard>
+}
 
 @code {
+    private bool isTeacher;
+    private PersistingComponentStateSubscription _persistSubscription;
     private List<StudentStatusDto>? students;
     private List<TestSessionDto> tests = new();
     private int? selectedTestId;
@@ -120,12 +134,34 @@
 
     protected override async Task OnInitializedAsync()
     {
+        _persistSubscription = AppState.RegisterOnPersisting(PersistAuthState);
+
+        if (AppState.TryTakeFromJson<bool>("isTeacher", out bool restored))
+        {
+            isTeacher = restored;
+        }
+        else
+        {
+            isTeacher = TeacherAuth.IsTeacher();
+        }
+
+        if (!isTeacher)
+        {
+            return;
+        }
+
         // Laad initiële data
         tests = DashboardService.GetTestSessions();
         LoadStudents();
 
         // Setup SignalR verbinding
         await SetupSignalRConnectionAsync();
+    }
+
+    private Task PersistAuthState()
+    {
+        AppState.PersistAsJson("isTeacher", isTeacher);
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -260,6 +296,7 @@
     /// </summary>
     public async ValueTask DisposeAsync()
     {
+        _persistSubscription.Dispose();
         if (hubConnection is not null)
         {
             await hubConnection.DisposeAsync();
