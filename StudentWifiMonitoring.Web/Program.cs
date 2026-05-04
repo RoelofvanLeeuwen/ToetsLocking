@@ -81,13 +81,29 @@ public class Program
 
         var app = builder.Build();
 
+        // Voer database migraties automatisch uit bij opstarten.
+        // Op een leeg Docker volume wordt de SQLite database en het schema aangemaakt.
+        // Op een bestaande database zijn migrations idempotent en doet dit niets.
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Database.Migrate();
+        }
+
         if (!app.Environment.IsDevelopment())
         {
             app.UseExceptionHandler("/Error");
             app.UseHsts();
         }
 
-        app.UseHttpsRedirection();
+        // HTTPS redirect is standaard uitgeschakeld zodat de applicatie op de Raspberry Pi
+        // via HTTP bereikbaar is zonder certificaatconfiguratie.
+        // Zet ForceHttps op true in configuratie (of via Docker environment variable
+        // FORCEHTTPS=true) als HTTPS wel vereist is.
+        if (app.Configuration.GetValue<bool>("ForceHttps"))
+        {
+            app.UseHttpsRedirection();
+        }
 
         app.UseStaticFiles();
         app.UseAntiforgery();
