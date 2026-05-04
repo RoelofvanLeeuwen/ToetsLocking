@@ -25,6 +25,7 @@ public class Program
         builder.Services.AddScoped<IStudentRegistrationService, StudentRegistrationService>();
         builder.Services.AddScoped<IStatusService, StatusService>();
         builder.Services.AddScoped<IMyScreenService, MyScreenService>();
+        builder.Services.AddScoped<IExportService, ExportService>();
 
         builder.Services.AddSignalR();
         builder.Services.AddHostedService<MonitoringService>();

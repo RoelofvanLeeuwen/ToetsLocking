@@ -1,0 +1,37 @@
+StudentName,TestName,EventType,TimestampUtc
+Test Student A,Acceptatietest Actieve Toets2,Connected,2026-03-26T09:46:45.9349793
+Test Student A,Acceptatietest Actieve Toets2,Disconnected,2026-03-26T09:52:08.1459846
+Test Student A,Acceptatietest Actieve Toets2,Connected,2026-03-26T10:05:54.0605283
+Test Student A,Acceptatietest Actieve Toets2,Disconnected,2026-03-26T10:06:23.5417522
+Test Student A,Acceptatietest Actieve Toets2,Connected,2026-03-26T10:07:40.6316097
+Test Student A,Acceptatietest Actieve Toets2,Disconnected,2026-03-26T10:08:37.0690128
+Test Student B,Acceptatietest Actieve Toets2,Connected,2026-03-26T10:08:45.1224770
+Test Student C,Acceptatietest Actieve Toets2,Connected,2026-03-26T10:08:49.1690054
+Test Student A,Acceptatietest Actieve Toets2,Connected,2026-03-26T10:08:51.2035444
+Test Student A,Acceptatietest Actieve Toets2,Disconnected,2026-03-26T10:08:57.2685857
+Test Student C,Acceptatietest Actieve Toets2,Disconnected,2026-03-26T10:08:59.3040209
+Test Student B,Acceptatietest Actieve Toets2,Disconnected,2026-03-26T10:09:01.3374845
+Test Student A,Acceptatietest Actieve Toets2,Connected,2026-03-26T10:09:09.4567472
+Test Student D,Acceptatietest Actieve Toets2,Connected,2026-03-26T10:09:13.5253264
+Test Student C,Acceptatietest Actieve Toets2,Connected,2026-03-26T10:09:15.5740522
+Test Student D,Acceptatietest Actieve Toets2,Disconnected,2026-03-26T10:09:25.6915931
+Test Student A,Acceptatietest Actieve Toets2,Disconnected,2026-03-26T10:09:29.7401796
+Test Student C,Acceptatietest Actieve Toets2,Disconnected,2026-03-26T10:09:29.7878566
+Test Student A,Acceptatietest Actieve Toets2,Connected,2026-03-26T10:23:06.9107647
+Test Student A,Acceptatietest Actieve Toets2,Connected,2026-03-26T11:28:19.5462121
+Test Student A,Acceptatietest Actieve Toets2,Disconnected,2026-03-26T11:28:31.7239866
+Test Student A,Acceptatietest Actieve Toets2,Disconnected,2026-03-26T11:28:50.0161185
+Test Student A,Een nieuwe toets,Connected,2026-03-26T11:29:24.1106049
+Test Student A,Een nieuwe toets,Disconnected,2026-03-26T11:29:58.6339537
+Test Student A,Een nieuwe toets,Connected,2026-03-26T15:08:59.6846175
+Test Student A,Een nieuwe toets,Disconnected,2026-03-26T15:09:34.0373128
+Test Student A,OOP,Connected,2026-03-30T09:32:17.5459334
+Test Student A,OOP,Disconnected,2026-03-30T09:33:46.1200363
+Test Student C,OOP,Connected,2026-05-04T09:09:17.3688478
+Test Student A,OOP,Connected,2026-05-04T09:10:01.8545843
+Test Student C,OOP,Disconnected,2026-05-04T09:12:10.8865984
+Test Student A,OOP,Disconnected,2026-05-04T09:12:33.0971923
+Test Student C,OOP,Connected,2026-05-04T09:22:34.7056789
+Test Student C,OOP,Disconnected,2026-05-04T09:22:40.9707399
+Test Student A,OOP,Connected,2026-05-04T09:22:43.0395132
+Test Student A,OOP,Disconnected,2026-05-04T09:23:49.5206491
