@@ -33,7 +33,10 @@ namespace ToetsLockingWifiMonitoring.Web
                 app.UseHsts();
             }
 
-            app.UseHttpsRedirection();
+            if (app.Configuration.GetValue<bool>("ForceHttps"))
+            {
+                app.UseHttpsRedirection();
+            }
 
             app.UseStaticFiles();
             app.UseAntiforgery();

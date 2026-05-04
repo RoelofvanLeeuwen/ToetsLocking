@@ -1,0 +1,60 @@
+# docker-compose.yml — ToetsLocking op Raspberry Pi
+#
+# Gebruik: docker compose up -d
+#
+# network_mode: host is bewust gekozen omdat de app Linux-netwerkcommando's
+# gebruikt (iw, ip) die direct toegang tot host-interfaces (bijv. eth1) nodig
+# hebben. Met bridge networking zijn host-interfaces niet zichtbaar vanuit de
+# container.
+#
+# SQLite wordt opgeslagen in een named volume gemount op /data zodat de
+# database behouden blijft bij container-restarts en updates.
+
+services:
+  toetslocking:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+
+    # Host networking geeft de container toegang tot alle host-interfaces
+    # (eth1, wlan0, etc.) zonder NAT — vereist voor iw en ip-commando's
+    network_mode: host
+
+    environment:
+      # ASP.NET Core omgeving
+      - ASPNETCORE_ENVIRONMENT=Production
+
+      # HTTP-only op de Pi — luister op poort 5000
+      - ASPNETCORE_URLS=http://+:5000
+
+      # SQLite-database in het gemounte volume
+      - ConnectionStrings__Default=Data Source=/data/app.db
+
+      # Netwerkmonitoring — pas Interface aan als eth1 anders heet op jouw Pi
+      - Monitoring__Interface=eth1
+      - Monitoring__PollSeconds=2
+
+      # Docent-wachtwoord — wijzig dit vóór productiegebruik
+      - Teacher__Password=vervang-dit
+
+      # Voorkom HTTPS-redirects (geen TLS op de Pi in deze setup)
+      # LET OP: app.UseHttpsRedirection() in Program.cs moet uitgeschakeld
+      # worden (of conditioneel gemaakt) zodat dit ook daadwerkelijk werkt.
+      # Zie README voor instructies.
+      - ASPNETCORE_FORWARDEDHEADERS_ENABLED=false
+
+    volumes:
+      # Persistente opslag voor de SQLite-database
+      - toetslocking-data:/data
+
+    # Optioneel: geef de container toegang tot het netwerk voor raw-socket
+    # operaties als dat later nodig blijkt
+    # cap_add:
+    #   - NET_ADMIN
+    #   - NET_RAW
+
+volumes:
+  toetslocking-data:
+    # Named volume — wordt beheerd door Docker op de Pi
+    # Locatie op de host: /var/lib/docker/volumes/toetslocking-data/_data

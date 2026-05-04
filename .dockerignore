@@ -1,0 +1,41 @@
+# Build-artefacten
+bin/
+obj/
+
+# Visual Studio bestanden
+.vs/
+*.user
+*.suo
+
+# Git-metadata (niet nodig in de image)
+.git/
+.gitignore
+.gitattributes
+
+# Docker-bestanden zelf (niet nodig in de build context)
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Lokale SQLite-databasebestanden
+*.db
+*.db-shm
+*.db-wal
+
+# Lokale configuratieoverschrijvingen
+appsettings.Development.json
+**/appsettings.Development.json
+
+# Publicatie-output mappen
+**/publish/
+
+# Node modules (indien aanwezig)
+node_modules/
+
+# Readme en documentatie (niet nodig in de image)
+*.md
+docs/
+
+# OS-bestanden
+.DS_Store
+Thumbs.db
