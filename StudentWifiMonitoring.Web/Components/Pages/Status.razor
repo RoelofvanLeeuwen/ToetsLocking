@@ -1,7 +1,8 @@
 ﻿@page "/status"
-@using StudentWifiMonitoring.Web.Data
-@using StudentWifiMonitoring.Web.Domain
-@inject AppDbContext Db
+@using StudentWifiMonitoring.Web.DTOs.Status
+@using StudentWifiMonitoring.Web.Services.Interfaces
+@inject IStatusService StatusService
+@implements IAsyncDisposable
 
 <h3>Connected Students</h3>
 
@@ -12,7 +13,7 @@
 else
 {
     <ul>
-        @foreach (var s in connected)
+        @foreach (ConnectedStudentDto s in connected)
         {
             <li>@s.Name (@s.MacAddress)</li>
         }
@@ -20,7 +21,7 @@ else
 }
 
 @code {
-    private List<Student>? connected;
+    private List<ConnectedStudentDto>? connected;
     private PeriodicTimer? timer;
     private CancellationTokenSource? cts;
 
@@ -35,12 +36,7 @@ else
 
     private Task RefreshAsync()
     {
-        connected = Db.Connections
-            .Where(c => c.DisconnectedAt == null && c.Student != null)
-            .Select(c => c.Student!)
-            .Distinct()
-            .ToList();
-
+        connected = StatusService.GetConnectedStudents();
         return Task.CompletedTask;
     }
 

@@ -23,6 +23,7 @@ public class Program
         builder.Services.AddScoped<IDashboardService, DashboardService>();
         builder.Services.AddScoped<ITestManagementService, TestManagementService>();
         builder.Services.AddScoped<IStudentRegistrationService, StudentRegistrationService>();
+        builder.Services.AddScoped<IStatusService, StatusService>();
 
         builder.Services.AddSignalR();
         builder.Services.AddHostedService<MonitoringService>();
