@@ -1,12 +1,11 @@
 @page "/dev/stations"
 @using StudentWifiMonitoring.Web.Services
-@using StudentWifiMonitoring.Web.Data
-@using StudentWifiMonitoring.Web.Domain
-@using Microsoft.EntityFrameworkCore
+@using StudentWifiMonitoring.Web.Services.Interfaces
+@using StudentWifiMonitoring.Web.DTOs.Students
 @rendermode InteractiveServer
 @inject IStationProvider StationProvider
+@inject IDevStationsService DevStationsService
 @inject IWebHostEnvironment Environment
-@inject AppDbContext DbContext
 
 <PageTitle>Development: Mock Stations</PageTitle>
 
@@ -205,7 +204,7 @@
     private string? _message;
     private bool _isError;
     private bool _isLoading;
-    private TestSession? _activeTestSession;
+    private ActiveTestSessionDto? _activeTestSession;
 
     protected override async Task OnInitializedAsync()
     {
@@ -214,15 +213,11 @@
     }
 
     /// <summary>
-    /// Laadt de actieve testsessie uit de database.
+    /// Laadt de actieve testsessie via de service.
     /// </summary>
     private async Task LoadActiveTestSessionAsync()
     {
-        var now = DateTime.UtcNow;
-        _activeTestSession = await DbContext.TestSessions
-            .Where(t => t.StartTime <= now && now <= t.EndTime)
-            .OrderBy(t => t.StartTime)
-            .FirstOrDefaultAsync();
+        _activeTestSession = await DevStationsService.GetActiveTestSessionAsync();
     }
 
     /// <summary>
@@ -333,66 +328,41 @@
 
     /// <summary>
     /// Snelle toevoeging van een volledige teststudent.
-    /// Maakt student aan in database en zet mock station online.
+    /// Maakt student aan in database (via service) en zet mock station online.
     /// </summary>
     private async Task QuickTestStudentAsync(string studentName, string macAddress)
     {
         _isLoading = true;
         try
         {
-            // 1. Controleer of er een actieve toets is
-            await LoadActiveTestSessionAsync();
-            if (_activeTestSession == null)
-            {
-                ShowError("Geen actieve toets gevonden. Maak eerst een toets aan via /tests.");
-                return;
-            }
-
-            // 2. Controleer of MockStationProvider beschikbaar is
+            // 1. Controleer of MockStationProvider beschikbaar is
             if (StationProvider is not MockStationProvider mockProvider)
             {
                 ShowError("MockStationProvider niet beschikbaar. Draait applicatie op Windows in development mode?");
                 return;
             }
 
-            // 3. Controleer MAC-adres formaat
+            // 2. Controleer MAC-adres formaat
             if (!IsValidMacAddress(macAddress))
             {
                 ShowError($"Ongeldig MAC-adres formaat: {macAddress}");
                 return;
             }
 
-            // 4. Maak student aan of update bestaande
-            var existingStudent = await DbContext.Students
-                .FirstOrDefaultAsync(s => s.MacAddress == macAddress.ToLowerInvariant());
-
-            if (existingStudent != null)
+            // 3. Maak student aan of update bestaande via service
+            var result = await DevStationsService.UpsertTestStudentAsync(studentName, macAddress);
+            if (!result.Success)
             {
-                // Update bestaande student
-                existingStudent.Name = studentName;
-                existingStudent.TestName = _activeTestSession.Name;
-            }
-            else
-            {
-                // Maak nieuwe student aan
-                var newStudent = new Student
-                {
-                    Name = studentName,
-                    MacAddress = macAddress.ToLowerInvariant(),
-                    TestName = _activeTestSession.Name
-                };
-                DbContext.Students.Add(newStudent);
+                ShowError(result.Message);
+                return;
             }
 
-            await DbContext.SaveChangesAsync();
-
-            // 5. Voeg mock station toe
-            var stationAdded = mockProvider.AddStation(macAddress);
+            // 4. Voeg mock station toe en herlaad actieve toets voor UI
+            mockProvider.AddStation(macAddress);
             await LoadStationsAsync();
+            await LoadActiveTestSessionAsync();
 
-            // 6. Toon succesbericht
-            var action = existingStudent != null ? "bijgewerkt" : "aangemaakt";
-            ShowSuccess($"✅ Student '{studentName}' {action} en mock station online gezet voor toets '{_activeTestSession.Name}'. MonitoringService detecteert connectie bij volgende poll.");
+            ShowSuccess($"✅ {result.Message} Mock station online gezet. MonitoringService detecteert connectie bij volgende poll.");
         }
         catch (Exception ex)
         {

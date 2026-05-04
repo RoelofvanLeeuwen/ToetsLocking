@@ -26,6 +26,7 @@ public class Program
         builder.Services.AddScoped<IStatusService, StatusService>();
         builder.Services.AddScoped<IMyScreenService, MyScreenService>();
         builder.Services.AddScoped<IExportService, ExportService>();
+        builder.Services.AddScoped<IDevStationsService, DevStationsService>();
 
         builder.Services.AddSignalR();
         builder.Services.AddHostedService<MonitoringService>();
