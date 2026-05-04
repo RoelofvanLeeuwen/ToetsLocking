@@ -2,6 +2,7 @@
 @using StudentWifiMonitoring.Web.DTOs.Export
 @using StudentWifiMonitoring.Web.Services.Interfaces
 @inject IExportService ExportService
+@inject IJSRuntime JS
 
 <h3>Export Events (Alles)</h3>
 <button @onclick="ExportAll">Download CSV</button>
@@ -13,8 +14,15 @@
     private async Task ExportAll()
     {
         ExportResultDto result = await ExportService.ExportAllAsync();
-        message = result.Success
-            ? $"Export opgeslagen als {result.FileName}"
-            : result.ErrorMessage;
+
+        if (result.Success && result.CsvContent != null && result.FileName != null)
+        {
+            await JS.InvokeVoidAsync("downloadCsvFile", result.FileName, result.CsvContent);
+            message = $"Download gestart: {result.FileName}";
+        }
+        else
+        {
+            message = result.ErrorMessage;
+        }
     }
 }

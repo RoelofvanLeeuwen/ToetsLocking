@@ -9,10 +9,11 @@ namespace StudentWifiMonitoring.Web.Services.Interfaces;
 public interface IExportService
 {
     /// <summary>
-    /// Exporteert alle events naar een CSV-bestand op de server.
-    /// De bestandsnaam bevat een tijdstempel en wordt teruggegeven in het resultaat.
+    /// Genereert een CSV-export van alle events in memory.
+    /// De inhoud wordt teruggegeven in de DTO zodat de browser de download direct kan starten.
+    /// Er worden geen bestanden op de server opgeslagen.
     /// </summary>
-    /// <returns>Resultaat met succes-indicatie en bestandsnaam of foutmelding.</returns>
+    /// <returns>Resultaat met succes-indicatie, bestandsnaam, CSV-inhoud of foutmelding.</returns>
     Task<ExportResultDto> ExportAllAsync();
 
     /// <summary>
@@ -22,10 +23,11 @@ public interface IExportService
     List<TestSessionDto> GetTestSessions();
 
     /// <summary>
-    /// Exporteert alle events van een specifieke toetssessie naar een CSV-bestand op de server.
-    /// De bestandsnaam bevat het toets-ID en een tijdstempel en wordt teruggegeven in het resultaat.
+    /// Genereert een CSV-export van alle events van een specifieke toetssessie in memory.
+    /// De inhoud wordt teruggegeven in de DTO zodat de browser de download direct kan starten.
+    /// Er worden geen bestanden op de server opgeslagen.
     /// </summary>
     /// <param name="testSessionId">ID van de toetssessie om te exporteren.</param>
-    /// <returns>Resultaat met succes-indicatie en bestandsnaam of foutmelding.</returns>
+    /// <returns>Resultaat met succes-indicatie, bestandsnaam, CSV-inhoud of foutmelding.</returns>
     Task<ExportResultDto> ExportByTestAsync(int testSessionId);
 }

@@ -3,6 +3,7 @@
 @using StudentWifiMonitoring.Web.DTOs.Tests
 @using StudentWifiMonitoring.Web.Services.Interfaces
 @inject IExportService ExportService
+@inject IJSRuntime JS
 
 <h3>Export per Toets</h3>
 
@@ -31,8 +32,15 @@
         if (selectedTestId == null) { message = "Geen toets geselecteerd."; return; }
 
         ExportResultDto result = await ExportService.ExportByTestAsync(selectedTestId.Value);
-        message = result.Success
-            ? $"Export opgeslagen als {result.FileName}"
-            : result.ErrorMessage;
+
+        if (result.Success && result.CsvContent != null && result.FileName != null)
+        {
+            await JS.InvokeVoidAsync("downloadCsvFile", result.FileName, result.CsvContent);
+            message = $"Download gestart: {result.FileName}";
+        }
+        else
+        {
+            message = result.ErrorMessage;
+        }
     }
 }

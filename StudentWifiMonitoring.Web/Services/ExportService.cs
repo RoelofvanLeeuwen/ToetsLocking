@@ -21,8 +21,9 @@ public class ExportService : IExportService
     }
 
     /// <summary>
-    /// Exporteert alle events naar een CSV-bestand op de server.
-    /// De bestandsnaam bevat een tijdstempel en wordt teruggegeven in het resultaat.
+    /// Genereert een CSV-export van alle events in memory.
+    /// De inhoud wordt teruggegeven in de DTO zodat de browser de download direct kan starten.
+    /// Er worden geen bestanden op de server opgeslagen.
     /// </summary>
     public async Task<ExportResultDto> ExportAllAsync()
     {
@@ -30,14 +31,14 @@ public class ExportService : IExportService
         {
             var csv = await CsvExporter.ExportAllAsync(_db);
             var fileName = $"events-all-{DateTime.UtcNow:yyyyMMdd-HHmmss}.csv";
-            await File.WriteAllTextAsync(fileName, csv);
 
-            _logger.LogInformation("Export succesvol opgeslagen als {FileName}", fileName);
+            _logger.LogInformation("Export gegenereerd: {FileName}", fileName);
 
             return new ExportResultDto
             {
                 Success = true,
-                FileName = fileName
+                FileName = fileName,
+                CsvContent = csv
             };
         }
         catch (Exception ex)
@@ -69,8 +70,9 @@ public class ExportService : IExportService
     }
 
     /// <summary>
-    /// Exporteert alle events van een specifieke toetssessie naar een CSV-bestand op de server.
-    /// De bestandsnaam bevat het toets-ID en een tijdstempel en wordt teruggegeven in het resultaat.
+    /// Genereert een CSV-export van alle events van een specifieke toetssessie in memory.
+    /// De inhoud wordt teruggegeven in de DTO zodat de browser de download direct kan starten.
+    /// Er worden geen bestanden op de server opgeslagen.
     /// </summary>
     public async Task<ExportResultDto> ExportByTestAsync(int testSessionId)
     {
@@ -78,14 +80,14 @@ public class ExportService : IExportService
         {
             var csv = await CsvExporter.ExportByTestAsync(_db, testSessionId);
             var fileName = $"events-test-{testSessionId}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.csv";
-            await File.WriteAllTextAsync(fileName, csv);
 
-            _logger.LogInformation("Export per toets succesvol opgeslagen als {FileName}", fileName);
+            _logger.LogInformation("Export per toets gegenereerd: {FileName}", fileName);
 
             return new ExportResultDto
             {
                 Success = true,
-                FileName = fileName
+                FileName = fileName,
+                CsvContent = csv
             };
         }
         catch (Exception ex)
