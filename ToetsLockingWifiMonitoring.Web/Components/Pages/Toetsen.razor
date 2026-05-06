@@ -1,0 +1,84 @@
+﻿@page "/toetsen"
+@using Microsoft.EntityFrameworkCore
+@using ToetsLockingWifiMonitoring.Web.Data
+@using ToetsLockingWifiMonitoring.Web.Domain
+@inject AppDbContext Db
+
+<h3>Toetsen</h3>
+
+<div class="mb-3">
+    <input @bind="newName" placeholder="Toetsnaam" class="form-control mb-2" />
+    <label>Start</label>
+    <input type="datetime-local" @bind="startTimeLocal" class="form-control mb-2" />
+    <label>Eind</label>
+    <input type="datetime-local" @bind="endTimeLocal" class="form-control mb-2" />
+    <button class="btn btn-primary" @onclick="CreateToets">Aanmaken</button>
+</div>
+
+<ul class="list-group">
+    @foreach (var t in tests)
+    {
+        <li class="list-group-item">
+            <div>
+                <strong>@t.Name</strong>
+            </div>
+            <div>
+                @t.StartTime.ToLocalTime():00 - @t.EndTime.ToLocalTime():00
+                @if (t.IsActive) { <span class="badge bg-success ms-2">Actief</span> }
+            </div>
+        </li>
+    }
+</ul>
+
+@code {
+    private List<TestSession> tests = new();
+    private string newName = string.Empty;
+    private DateTime startTimeLocal = DateTime.Now;
+    private DateTime endTimeLocal = DateTime.Now.AddHours(2);
+
+    /// <summary>
+    /// Called by the Blazor runtime when the component is initialized.
+    /// Loads all test sessions from the database ordered by start time (descending)
+    /// and stores them in the <see cref="tests"/> list for rendering.
+    /// </summary>
+    /// <returns>
+    /// A <see cref="Task"/> that represents the asynchronous operation.
+    /// </returns>
+    protected override async Task OnInitializedAsync()
+    {
+        tests = await Db.TestSessions
+                        .OrderByDescending(t => t.StartTime)
+                        .ToListAsync();
+    }
+
+    /// <summary>
+    /// Creates a new test session from the input fields and persists it to the database.
+    /// The input local start/end times are converted to UTC before saving.
+    /// After successful save the new session is inserted at the top of the <see cref="tests"/> list
+    /// and the input name is cleared.
+    /// </summary>
+    /// <returns>
+    /// A <see cref="Task"/> that completes when the session has been saved and the UI updated.
+    /// </returns>
+    private async Task CreateToets()
+    {
+        var startUtc = DateTime.SpecifyKind(startTimeLocal, DateTimeKind.Local).ToUniversalTime();
+        var endUtc = DateTime.SpecifyKind(endTimeLocal, DateTimeKind.Local).ToUniversalTime();
+
+        var session = new TestSession
+        {
+            Name = newName,
+            StartTime = startUtc,
+            EndTime = endUtc
+        };
+
+        Db.TestSessions.Add(session);
+        await Db.SaveChangesAsync();
+
+        // show newly created at top
+        tests.Insert(0, session);
+
+        // reset input
+        newName = string.Empty;
+    }
+}

@@ -1,0 +1,104 @@
+﻿@page "/status"
+@using StudentWifiMonitoring.Web.DTOs.Status
+@using StudentWifiMonitoring.Web.Services.Interfaces
+@inject IStatusService StatusService
+@inject ITeacherAuthService TeacherAuth
+@inject PersistentComponentState AppState
+@implements IAsyncDisposable
+
+@if (!isTeacher)
+{
+    <div class="container mt-4">
+        <div class="alert alert-warning mt-5">
+            <h4 class="alert-heading">🔒 Geen toegang</h4>
+            <p class="mb-0">Deze pagina is alleen beschikbaar voor docenten.</p>
+        </div>
+    </div>
+}
+else
+{
+<h3>Connected Students</h3>
+
+@if (connected == null)
+{
+    <p>Loading…</p>
+}
+else
+{
+    <ul>
+        @foreach (ConnectedStudentDto s in connected)
+        {
+            <li>@s.Name (@s.MacAddress)</li>
+        }
+    </ul>
+}
+}
+
+@code {
+    private bool isTeacher;
+    private PersistingComponentStateSubscription _persistSubscription;
+    private List<ConnectedStudentDto>? connected;
+    private PeriodicTimer? timer;
+    private CancellationTokenSource? cts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _persistSubscription = AppState.RegisterOnPersisting(PersistAuthState);
+
+        if (AppState.TryTakeFromJson<bool>("isTeacher", out bool restored))
+        {
+            isTeacher = restored;
+        }
+        else
+        {
+            isTeacher = TeacherAuth.IsTeacher();
+        }
+
+        if (!isTeacher)
+        {
+            return;
+        }
+
+        await RefreshAsync();
+
+        cts = new CancellationTokenSource();
+        timer = new PeriodicTimer(TimeSpan.FromSeconds(3));
+        _ = PollAsync(cts.Token);
+    }
+
+    private Task PersistAuthState()
+    {
+        AppState.PersistAsJson("isTeacher", isTeacher);
+        return Task.CompletedTask;
+    }
+
+    private Task RefreshAsync()
+    {
+        connected = StatusService.GetConnectedStudents();
+        return Task.CompletedTask;
+    }
+
+    private async Task PollAsync(CancellationToken token)
+    {
+        try
+        {
+            while (await timer!.WaitForNextTickAsync(token))
+            {
+                await RefreshAsync();
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            _persistSubscription.Dispose();
+            cts?.Cancel();
+            timer?.Dispose();
+        }
+        catch { }
+    }
+}

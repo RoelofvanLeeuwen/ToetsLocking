@@ -1,0 +1,653 @@
+﻿@page "/tests"
+@rendermode InteractiveServer
+@using StudentWifiMonitoring.Web.DTOs.Tests
+@using StudentWifiMonitoring.Web.Services.Interfaces
+@inject ITestManagementService TestManagementService
+@inject ITeacherAuthService TeacherAuth
+@inject PersistentComponentState AppState
+@inject ILogger<Tests> Logger
+
+<PageTitle>Beheer Toetsen</PageTitle>
+
+@if (!isTeacher)
+{
+    <div class="container mt-4">
+        <div class="alert alert-warning mt-5">
+            <h4 class="alert-heading">🔒 Geen toegang</h4>
+            <p class="mb-0">Deze pagina is alleen beschikbaar voor docenten.</p>
+        </div>
+    </div>
+}
+else
+{
+<!-- Bevestigingsmodal voor inactief zetten -->
+@if (showConfirmModal && testToDeactivate != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title">⚠️ Toets Inactief Zetten</h5>
+                    <button type="button" class="btn-close" @onclick="CancelDeactivate"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Let op:</strong> Je staat op het punt om de volgende toets inactief te zetten:</p>
+                    <div class="alert alert-info">
+                        <strong>@testToDeactivate.Name</strong><br/>
+                        <small>@testToDeactivate.StartTime.ToLocalTime().ToString("dd-MM-yyyy HH:mm") - @testToDeactivate.EndTime.ToLocalTime().ToString("dd-MM-yyyy HH:mm")</small>
+                    </div>
+                    <p class="text-danger mb-0">
+                        <strong>⚠️ Alle momenteel verbonden studenten worden automatisch gedisconnect!</strong>
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CancelDeactivate">
+                        ❌ Annuleren
+                    </button>
+                    <button type="button" class="btn btn-warning" @onclick="ConfirmDeactivateAsync">
+                        ⏹️ Ja, Inactief Zetten
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h3>📝 Beheer Toetsen</h3>
+        </div>
+        <div class="card-body">
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger alert-dismissible fade show">
+                    @errorMessage
+                    <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(successMessage))
+            {
+                <div class="alert alert-success alert-dismissible fade show">
+                    @successMessage
+                    <button type="button" class="btn-close" @onclick="() => successMessage = string.Empty"></button>
+                </div>
+            }
+
+            @if (editingTest == null)
+            {
+                <!-- Nieuwe Toets Aanmaken -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">➕ Nieuwe Toets Aanmaken</h5>
+                        
+                        <div class="mb-3">
+                            <label for="testName" class="form-label">Toetsnaam:</label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="testName" 
+                                   @bind="newName" 
+                                   placeholder="Voer toetsnaam in" />
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="startTime" class="form-label">Starttijd (lokale tijd):</label>
+                                <input type="datetime-local" 
+                                       class="form-control" 
+                                       id="startTime" 
+                                       @bind="startTimeLocal" />
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="endTime" class="form-label">Eindtijd (lokale tijd):</label>
+                                <input type="datetime-local" 
+                                       class="form-control" 
+                                       id="endTime" 
+                                       @bind="endTimeLocal" />
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary" @onclick="CreateTestAsync">
+                            ➕ Toets Aanmaken
+                        </button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <!-- Toets Bewerken -->
+                <div class="card mb-4 border-warning">
+                    <div class="card-body">
+                        <h5 class="card-title">✏️ Toets Bewerken</h5>
+                        
+                        <div class="mb-3">
+                            <label for="editName" class="form-label">Toetsnaam:</label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="editName" 
+                                   @bind="editName" 
+                                   placeholder="Voer toetsnaam in" />
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="editStartTime" class="form-label">Starttijd (lokale tijd):</label>
+                                <input type="datetime-local" 
+                                       class="form-control" 
+                                       id="editStartTime" 
+                                       @bind="editStartTimeLocal" />
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="editEndTime" class="form-label">Eindtijd (lokale tijd):</label>
+                                <input type="datetime-local" 
+                                       class="form-control" 
+                                       id="editEndTime" 
+                                       @bind="editEndTimeLocal" />
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-success" @onclick="SaveEditAsync">
+                                💾 Opslaan
+                            </button>
+                            <button class="btn btn-secondary" @onclick="CancelEdit">
+                                ❌ Annuleren
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <!-- Bestaande Toetsen met Zoeken en Paginatie -->
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="card-title mb-0">📋 Bestaande Toetsen</h5>
+                        @if (!string.IsNullOrEmpty(searchTerm))
+                        {
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="ClearSearchAsync">
+                                🔄 Toon Alle Toetsen
+                            </button>
+                        }
+                    </div>
+                    
+                    <!-- Zoekbalk -->
+                    <div class="mb-3">
+                        <div class="input-group">
+                            <span class="input-group-text">🔍</span>
+                            <input type="text" 
+                                   class="form-control" 
+                                   placeholder="Zoek op toetsnaam..." 
+                                   @bind="searchTerm"
+                                   @bind:event="oninput"
+                                   @bind:after="OnSearchChangedAsync" />
+                            @if (!string.IsNullOrEmpty(searchTerm))
+                            {
+                                <button class="btn btn-outline-secondary" @onclick="ClearSearchAsync" title="Zoekfilter wissen">
+                                    ❌
+                                </button>
+                            }
+                        </div>
+                        @if (!string.IsNullOrEmpty(searchTerm))
+                        {
+                            <small class="text-muted">
+                                Zoeken naar: <strong>"@searchTerm"</strong>
+                            </small>
+                        }
+                    </div>
+
+                    @if (isLoading)
+                    {
+                        <div class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Laden...</span>
+                            </div>
+                            <p class="mt-2 text-muted">Toetsen laden...</p>
+                        </div>
+                    }
+                    else if (pagedResult == null || pagedResult.Items.Count == 0)
+                    {
+                        <!-- Verbeterde lege-state berichten -->
+                        <div class="text-center py-5">
+                            @if (string.IsNullOrEmpty(searchTerm))
+                            {
+                                <div class="mb-3">
+                                    <span style="font-size: 64px;">📝</span>
+                                </div>
+                                <h5>Nog geen toetsen aangemaakt</h5>
+                                <p class="text-muted">Maak je eerste toets aan met het formulier hierboven.</p>
+                            }
+                            else
+                            {
+                                <div class="mb-3">
+                                    <span style="font-size: 64px;">🔍</span>
+                                </div>
+                                <h5>Geen resultaten gevonden</h5>
+                                <p class="text-muted">
+                                    Er zijn geen toetsen gevonden die voldoen aan "<strong>@searchTerm</strong>".
+                                </p>
+                                <button class="btn btn-primary" @onclick="ClearSearchAsync">
+                                    🔄 Toon Alle Toetsen
+                                </button>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- Toetsenlijst met verbeterde statusweergave en actieknoppen -->
+                        <div class="list-group mb-3">
+                            @foreach (var t in pagedResult.Items)
+                            {
+                                var isActive = t.IsActive;
+                                <div class="list-group-item @(isActive ? "border-success border-2" : "")">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <h6 class="mb-0 me-2">@t.Name</h6>
+                                                @if (isActive)
+                                                {
+                                                    <span class="badge bg-success" style="font-size: 0.9em;">
+                                                        <i class="bi bi-circle-fill" style="font-size: 0.6em;"></i> ACTIEF
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary" style="font-size: 0.9em;">
+                                                        <i class="bi bi-circle" style="font-size: 0.6em;"></i> INACTIEF
+                                                    </span>
+                                                }
+                                            </div>
+                                            <div class="text-muted small">
+                                                <div>
+                                                    <strong>📅 Start:</strong> @t.StartTime.ToLocalTime().ToString("dd-MM-yyyy HH:mm")
+                                                </div>
+                                                <div>
+                                                    <strong>🏁 Eind:</strong> @t.EndTime.ToLocalTime().ToString("dd-MM-yyyy HH:mm")
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="d-flex flex-column gap-2" style="min-width: 160px;">
+                                            @if (isActive)
+                                            {
+                                                <button class="btn btn-sm btn-warning w-100" 
+                                                        @onclick="() => ShowDeactivateConfirmAsync(t)"
+                                                        disabled="@(editingTest != null)"
+                                                        title="Zet deze actieve toets op inactief (studenten worden gedisconnect)">
+                                                    <strong>⏹️ Inactief Zetten</strong>
+                                                </button>
+                                            }
+                                            <button class="btn btn-sm btn-outline-primary w-100" 
+                                                    @onclick="() => StartEdit(t)"
+                                                    disabled="@(editingTest != null)"
+                                                    title="Bewerk deze toets">
+                                                ✏️ Bewerken
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        <!-- Paginatie -->
+                        @if (pagedResult.TotalPages > 1)
+                        {
+                            <nav aria-label="Toetsen paginatie">
+                                <ul class="pagination justify-content-center mb-3">
+                                    <li class="page-item @(!pagedResult.HasPreviousPage ? "disabled" : "")">
+                                        <button class="page-link" @onclick="PreviousPageAsync" disabled="@(!pagedResult.HasPreviousPage)">
+                                            « Vorige
+                                        </button>
+                                    </li>
+                                    
+                                    @for (int i = 1; i <= pagedResult.TotalPages; i++)
+                                    {
+                                        var pageNumber = i;
+                                        <li class="page-item @(pagedResult.PageNumber == pageNumber ? "active" : "")">
+                                            <button class="page-link" @onclick="() => GoToPageAsync(pageNumber)">
+                                                @pageNumber
+                                            </button>
+                                        </li>
+                                    }
+                                    
+                                    <li class="page-item @(!pagedResult.HasNextPage ? "disabled" : "")">
+                                        <button class="page-link" @onclick="NextPageAsync" disabled="@(!pagedResult.HasNextPage)">
+                                            Volgende »
+                                        </button>
+                                    </li>
+                                </ul>
+                            </nav>
+                        }
+
+                        <!-- Statistieken -->
+                        <div class="text-center">
+                            <small class="text-muted">
+                                @if (pagedResult.TotalPages > 1)
+                                {
+                                    <text>Pagina @pagedResult.PageNumber van @pagedResult.TotalPages | </text>
+                                }
+                                <strong>@pagedResult.TotalCount</strong> toets@(pagedResult.TotalCount != 1 ? "en" : "")
+                                @if (!string.IsNullOrEmpty(searchTerm))
+                                {
+                                    <text> gevonden</text>
+                                }
+                            </small>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+}
+
+@code {
+    private bool isTeacher;
+    private PersistingComponentStateSubscription _persistSubscription;
+
+    // Paginatie en zoeken
+    private PagedResultDto<TestSessionDto>? pagedResult;
+    private string searchTerm = string.Empty;
+    private int currentPage = 1;
+    private const int PageSize = 10;
+    private bool isLoading = true;
+
+    // Nieuwe toets aanmaken
+    private string newName = string.Empty;
+    private DateTime startTimeLocal = DateTime.Now;
+    private DateTime endTimeLocal = DateTime.Now.AddHours(2);
+
+    // Toets bewerken
+    private TestSessionDto? editingTest;
+    private string editName = string.Empty;
+    private DateTime editStartTimeLocal;
+    private DateTime editEndTimeLocal;
+
+    // Bevestigingsmodal voor inactief zetten
+    private bool showConfirmModal = false;
+    private TestSessionDto? testToDeactivate;
+
+    // Berichten
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _persistSubscription = AppState.RegisterOnPersisting(PersistAuthState);
+
+        if (AppState.TryTakeFromJson<bool>("isTeacher", out bool restored))
+        {
+            isTeacher = restored;
+        }
+        else
+        {
+            isTeacher = TeacherAuth.IsTeacher();
+        }
+
+        if (!isTeacher)
+        {
+            return;
+        }
+
+        await LoadTestsAsync();
+    }
+
+    private Task PersistAuthState()
+    {
+        AppState.PersistAsJson("isTeacher", isTeacher);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Laadt toetsen via de service met paginatie en filtering.
+    /// </summary>
+    private async Task LoadTestsAsync()
+    {
+        isLoading = true;
+        try
+        {
+            pagedResult = await TestManagementService.GetPagedTestsAsync(searchTerm, currentPage, PageSize);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// Handler voor zoekterm wijziging - reset naar pagina 1.
+    /// </summary>
+    private async Task OnSearchChangedAsync()
+    {
+        currentPage = 1;
+        await LoadTestsAsync();
+    }
+
+    /// <summary>
+    /// Wist de zoekterm en herlaadt alle toetsen.
+    /// </summary>
+    private async Task ClearSearchAsync()
+    {
+        searchTerm = string.Empty;
+        currentPage = 1;
+        await LoadTestsAsync();
+    }
+
+    /// <summary>
+    /// Navigeert naar de vorige pagina.
+    /// </summary>
+    private async Task PreviousPageAsync()
+    {
+        if (pagedResult?.HasPreviousPage == true)
+        {
+            currentPage--;
+            await LoadTestsAsync();
+        }
+    }
+
+    /// <summary>
+    /// Navigeert naar de volgende pagina.
+    /// </summary>
+    private async Task NextPageAsync()
+    {
+        if (pagedResult?.HasNextPage == true)
+        {
+            currentPage++;
+            await LoadTestsAsync();
+        }
+    }
+
+    /// <summary>
+    /// Navigeert naar een specifieke pagina.
+    /// </summary>
+    private async Task GoToPageAsync(int pageNumber)
+    {
+        if (pageNumber >= 1 && pageNumber <= (pagedResult?.TotalPages ?? 1))
+        {
+            currentPage = pageNumber;
+            await LoadTestsAsync();
+        }
+    }
+
+    /// <summary>
+    /// Maakt een nieuwe toets aan via de service.
+    /// </summary>
+    private async Task CreateTestAsync()
+    {
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+
+        try
+        {
+            var createDto = new TestSessionCreateDto
+            {
+                Name = newName,
+                StartTimeLocal = startTimeLocal,
+                EndTimeLocal = endTimeLocal
+            };
+
+            var result = await TestManagementService.CreateTestAsync(createDto);
+
+            if (result.Success)
+            {
+                await LoadTestsAsync();
+                successMessage = $"Toets '{newName.Trim()}' succesvol aangemaakt.";
+
+                // Reset form
+                newName = string.Empty;
+                startTimeLocal = DateTime.Now;
+                endTimeLocal = DateTime.Now.AddHours(2);
+            }
+            else
+            {
+                errorMessage = result.ErrorMessage ?? "Er is een fout opgetreden.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Fout bij het aanmaken van toets");
+            errorMessage = "Er is een fout opgetreden bij het aanmaken van de toets.";
+        }
+    }
+
+    /// <summary>
+    /// Toont bevestigingsmodal voordat toets inactief wordt gezet.
+    /// </summary>
+    private Task ShowDeactivateConfirmAsync(TestSessionDto test)
+    {
+        testToDeactivate = test;
+        showConfirmModal = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Annuleert het inactief zetten.
+    /// </summary>
+    private void CancelDeactivate()
+    {
+        showConfirmModal = false;
+        testToDeactivate = null;
+    }
+
+    /// <summary>
+    /// Bevestigt en voert het inactief zetten uit via de service.
+    /// </summary>
+    private async Task ConfirmDeactivateAsync()
+    {
+        if (testToDeactivate != null)
+        {
+            showConfirmModal = false;
+            await SetInactiveAsync(testToDeactivate);
+            testToDeactivate = null;
+        }
+    }
+
+    /// <summary>
+    /// Zet een actieve toets inactief via de service.
+    /// </summary>
+    private async Task SetInactiveAsync(TestSessionDto test)
+    {
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+
+        try
+        {
+            var result = await TestManagementService.DeactivateTestAsync(test.Id);
+
+            await LoadTestsAsync();
+
+            if (result.DisconnectedStudentsCount > 0)
+            {
+                successMessage = $"✅ Toets '{result.TestName}' is inactief gezet en {result.DisconnectedStudentsCount} actieve verbinding(en) zijn gesloten.";
+            }
+            else
+            {
+                successMessage = $"✅ Toets '{result.TestName}' is inactief gezet.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Fout bij het inactief zetten van toets");
+            errorMessage = "Er is een fout opgetreden bij het inactief zetten van de toets.";
+        }
+    }
+
+    /// <summary>
+    /// Start bewerkingsmodus voor een toets.
+    /// </summary>
+    private void StartEdit(TestSessionDto test)
+    {
+        editingTest = test;
+        editName = test.Name;
+        editStartTimeLocal = test.StartTime.ToLocalTime();
+        editEndTimeLocal = test.EndTime.ToLocalTime();
+
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+    }
+
+    /// <summary>
+    /// Annuleert bewerkingsmodus.
+    /// </summary>
+    private void CancelEdit()
+    {
+        editingTest = null;
+        editName = string.Empty;
+        errorMessage = string.Empty;
+    }
+
+    /// <summary>
+    /// Slaat bewerkingen op via de service.
+    /// </summary>
+    private async Task SaveEditAsync()
+    {
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+
+        try
+        {
+            if (editingTest == null)
+            {
+                return;
+            }
+
+            var updateDto = new TestSessionUpdateDto
+            {
+                Id = editingTest.Id,
+                Name = editName,
+                StartTimeLocal = editStartTimeLocal,
+                EndTimeLocal = editEndTimeLocal
+            };
+
+            var result = await TestManagementService.UpdateTestAsync(updateDto);
+
+            if (result.Success)
+            {
+                await LoadTestsAsync();
+                successMessage = $"✅ Toets '{editName.Trim()}' succesvol bijgewerkt.";
+
+                // Reset edit mode
+                editingTest = null;
+                editName = string.Empty;
+            }
+            else
+            {
+                errorMessage = result.ErrorMessage ?? "Er is een fout opgetreden.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Fout bij het opslaan van toets");
+            errorMessage = "Er is een fout opgetreden bij het opslaan van de toets.";
+        }
+    }
+
+    public void Dispose()
+    {
+        _persistSubscription.Dispose();
+    }
+}

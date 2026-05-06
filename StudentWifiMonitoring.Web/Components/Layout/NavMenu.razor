@@ -1,0 +1,75 @@
+﻿@inject IWebHostEnvironment HostEnvironment
+@inject StudentWifiMonitoring.Web.Services.Interfaces.ITeacherAuthService TeacherAuth
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">Student Wifi Monitoring</a>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="register">
+                <span class="bi bi-pencil-square" aria-hidden="true"></span> Registreren
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="myscreen">
+                <span class="bi bi-display" aria-hidden="true"></span> Mijn Scherm
+            </NavLink>
+        </div>
+
+        @if (TeacherAuth.IsTeacher())
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                    <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Dashboard
+                </NavLink>
+            </div>
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="tests">
+                    <span class="bi bi-list-check" aria-hidden="true"></span> Toetsen
+                </NavLink>
+            </div>
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="status">
+                    <span class="bi bi-wifi" aria-hidden="true"></span> Status
+                </NavLink>
+            </div>
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="export">
+                    <span class="bi bi-download" aria-hidden="true"></span> Export
+                </NavLink>
+            </div>
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="export-by-test">
+                    <span class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></span> Export per Toets
+                </NavLink>
+            </div>
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="teacher">
+                    <span class="bi bi-box-arrow-right" aria-hidden="true"></span> Uitloggen
+                </NavLink>
+            </div>
+
+            @if (HostEnvironment.IsDevelopment())
+            {
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="dev/stations">
+                        <span class="bi bi-wrench" aria-hidden="true"></span> Dev Stations
+                    </NavLink>
+                </div>
+            }
+        }
+        }
+    </nav>
+</div>

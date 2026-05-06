@@ -1,0 +1,158 @@
+﻿@page "/register"
+@rendermode InteractiveServer
+@using StudentWifiMonitoring.Web.DTOs.Students
+@using StudentWifiMonitoring.Web.Services.Interfaces
+@inject IStudentRegistrationService RegistrationService
+@inject IHttpContextAccessor HttpContextAccessor
+@inject ILogger<Register> Logger
+
+<PageTitle>Registreren</PageTitle>
+
+<div class="container mt-4">
+    <h2>Student Registratie</h2>
+
+    @if (_activeSession == null)
+    {
+        <div class="alert alert-warning mt-3">
+            <strong>Geen actieve toets</strong>
+            <p class="mb-0">Er is momenteel geen toets actief. Registratie is alleen mogelijk tijdens een actieve toets.</p>
+        </div>
+    }
+    else
+    {
+        <div class="card mt-3">
+            <div class="card-body">
+                <h5 class="card-title">Toets: @_activeSession.Name</h5>
+                <p class="text-muted">Looptijd: @_activeSession.StartTime.ToLocalTime().ToString("dd-MM-yyyy HH:mm") - @_activeSession.EndTime.ToLocalTime().ToString("dd-MM-yyyy HH:mm")</p>
+
+                <div class="mb-3">
+                    <label for="studentName" class="form-label">Naam:</label>
+                    <input type="text" 
+                           class="form-control" 
+                           id="studentName" 
+                           @bind="_studentName" 
+                           placeholder="Voer je naam in"
+                           disabled="@_isProcessing" />
+                </div>
+
+                <button class="btn btn-primary" 
+                        @onclick="RegisterAsync" 
+                        disabled="@(_isProcessing || string.IsNullOrWhiteSpace(_studentName))">
+                    @if (_isProcessing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        <span>Bezig met registreren...</span>
+                    }
+                    else
+                    {
+                        <span>Registreren</span>
+                    }
+                </button>
+
+                @if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <div class="alert alert-danger mt-3">
+                        <strong>Fout</strong>
+                        <p class="mb-0">@_errorMessage</p>
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(_successMessage))
+                {
+                    <div class="alert alert-success mt-3">
+                        <strong>Gelukt!</strong>
+                        <p class="mb-0">@_successMessage</p>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private ActiveTestSessionDto? _activeSession;
+    private string _studentName = string.Empty;
+    private string _errorMessage = string.Empty;
+    private string _successMessage = string.Empty;
+    private bool _isProcessing = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadActiveSessionAsync();
+    }
+
+    /// <summary>
+    /// Laadt de huidige actieve toetssessie via de service.
+    /// </summary>
+    private async Task LoadActiveSessionAsync()
+    {
+        _activeSession = await RegistrationService.GetActiveTestSessionAsync();
+    }
+
+    /// <summary>
+    /// Registreert de student voor de actieve toets via de service.
+    /// Verzamelt het client IP-adres en geeft dit door aan de service.
+    /// </summary>
+    private async Task RegisterAsync()
+    {
+        _errorMessage = string.Empty;
+        _successMessage = string.Empty;
+        _isProcessing = true;
+
+        try
+        {
+            // Valideer naam (eerste check in UI voor snelle feedback)
+            if (string.IsNullOrWhiteSpace(_studentName))
+            {
+                _errorMessage = "Voer een geldige naam in.";
+                return;
+            }
+
+            // Controleer opnieuw of er een actieve sessie is
+            if (_activeSession == null)
+            {
+                _errorMessage = "Er is geen actieve toets meer. Probeer de pagina te vernieuwen.";
+                return;
+            }
+
+            // Bepaal client IP-adres (praktisch om hier te doen vanwege HttpContext toegang)
+            var httpContext = HttpContextAccessor.HttpContext;
+            if (httpContext?.Connection?.RemoteIpAddress == null)
+            {
+                Logger.LogWarning("Kan client IP-adres niet bepalen tijdens registratie");
+                _errorMessage = "Kan je IP-adres niet bepalen. Neem contact op met de docent.";
+                return;
+            }
+
+            var clientIp = httpContext.Connection.RemoteIpAddress.ToString();
+
+            // Registreer via service
+            var request = new StudentRegistrationRequestDto
+            {
+                StudentName = _studentName,
+                ClientIpAddress = clientIp
+            };
+
+            var result = await RegistrationService.RegisterStudentAsync(request);
+
+            if (result.Success)
+            {
+                _successMessage = result.SuccessMessage ?? "Registratie succesvol.";
+                _studentName = string.Empty; // Reset form
+            }
+            else
+            {
+                _errorMessage = result.ErrorMessage ?? "Er is een fout opgetreden.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Onverwachte fout tijdens registratie van student");
+            _errorMessage = "Er is een onverwachte fout opgetreden. Probeer het opnieuw of neem contact op met de docent.";
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+}
