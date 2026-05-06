@@ -173,11 +173,281 @@ Clients die luisteren:
 
 `Status.razor` gebruikt geen SignalR, maar pollt elke 3 seconden via `PeriodicTimer`.
 
-## Belangrijkste services
+## Services per bestand
 
-### StudentRegistrationService
+Deze sectie beschrijft expliciet de verantwoordelijkheid van elk `.cs` bestand in `StudentWifiMonitoring.Web/Services`.
 
-Verantwoordelijkheden:
+### CsvExporter.cs
+
+Type:
+
+- statische helper, geen DI-service
+
+Verantwoordelijkheid:
+
+- omzetting van `EventLog` data naar CSV-tekst
+- escaping van CSV-velden
+- sortering van exportregels op timestamp
+
+Functioneel gebruik:
+
+- wordt aangeroepen door `ExportService`
+- ondersteunt zowel export van alle events als export per toets
+
+Belangrijke eigenschap:
+
+- schrijft niets naar disk; retourneert alleen een `string`
+
+### DashboardService.cs
+
+Type:
+
+- scoped applicatieservice
+
+Verantwoordelijkheid:
+
+- ophalen van toetslijsten voor het dashboard
+- leveren van studentoverzichten met online/offline status
+- filteren op geselecteerde toets
+
+Gebruikt door:
+
+- `Home.razor`
+
+Belangrijke implementatiedetails:
+
+- bepaalt online status op basis van open `Connection` records
+- filtert studenten per toets via `Student.TestName`
+- retourneert DTO's en geen EF-entiteiten
+
+### DevelopmentMacResolverDecorator.cs
+
+Type:
+
+- singleton infrastructuurservice via `IMacResolver`
+
+Verantwoordelijkheid:
+
+- wrapper rondom de echte MAC-resolver
+- development fallback toepassen wanneer echte resolutie faalt
+
+Gebruikt door:
+
+- `StudentRegistrationService`
+- `MyScreen.razor` via `IMacResolver`
+
+Belangrijke implementatiedetails:
+
+- gebruikt `IWebHostEnvironment` om alleen in `Development` fallback toe te staan
+- leest `DevelopmentTesting:EnableMockMacAddress` en `DevelopmentTesting:MockMacAddress`
+- voorkomt dat mock MAC-resolutie in productie actief wordt
+
+### DevStationsService.cs
+
+Type:
+
+- scoped applicatieservice
+
+Verantwoordelijkheid:
+
+- developmentflow ondersteunen voor mock WiFi-clients
+- actieve toets ophalen voor de dev-pagina
+- teststudent aanmaken of bijwerken op basis van opgegeven MAC-adres
+
+Gebruikt door:
+
+- `DevStations.razor`
+
+Belangrijke implementatiedetails:
+
+- gebruikt dezelfde actieve-toetslogica als registratie en monitoring
+- normaliseert MAC-adressen naar lowercase
+- koppelt teststudenten aan de actuele `TestName`
+
+### ExportService.cs
+
+Type:
+
+- scoped applicatieservice
+
+Verantwoordelijkheid:
+
+- browsergerichte exportfunctionaliteit aanbieden als DTO-resultaat
+- CSV-generatie orkestreren via `CsvExporter`
+- bestandsnaam, successtatus en foutmelding samenstellen
+
+Gebruikt door:
+
+- `Export.razor`
+- `ExportByTest.razor`
+
+Belangrijke implementatiedetails:
+
+- levert CSV in memory aan de UI
+- slaat geen tijdelijke exportbestanden op de server op
+- levert ook toetslijsten voor de exportselectie
+
+### IStationProvider.cs
+
+Type:
+
+- infrastructuurcontract plus `Station` record
+
+Verantwoordelijkheid:
+
+- uniforme abstractie voor het ophalen van verbonden stations
+- vastleggen van het dataformaat `Station(MacAddress)`
+
+Implementaties:
+
+- `LinuxIwStationProvider`
+- `MockStationProvider`
+
+Belang:
+
+- `MonitoringService` hoeft niet te weten of stations uit Linux tooling of uit een mocklijst komen
+
+### LinuxIwStationProvider.cs
+
+Type:
+
+- singleton infrastructuurservice via `IStationProvider`
+
+Verantwoordelijkheid:
+
+- uitlezen van verbonden stations op Linux via `iw`
+
+Gebruikt door:
+
+- `MonitoringService` in Linux/Raspberry Pi runtime
+
+Belangrijke implementatiedetails:
+
+- leest interface uit `Monitoring:Interface`
+- voert `/usr/sbin/iw dev <iface> station dump` uit
+- parseert MAC-adressen via regex
+
+### MacResolver.cs
+
+Type:
+
+- infrastructuurcontract plus twee concrete platformresolvers
+
+Bevat:
+
+- `IMacResolver`
+- `LinuxMacResolver`
+- `WindowsMacResolver`
+
+Verantwoordelijkheid:
+
+- herleiden van MAC-adressen uit een client-IP
+
+Functioneel gebruik:
+
+- registratieflow
+- studentstatusflow in `MyScreen`
+
+Belangrijke implementatiedetails:
+
+- Linux gebruikt `/usr/sbin/ip neigh show <ip>`
+- Windows gebruikt `arp -a <ip>`
+- beide resolvers normaliseren output naar lowercase
+
+### MockStationProvider.cs
+
+Type:
+
+- singleton infrastructuurservice via `IStationProvider`
+
+Verantwoordelijkheid:
+
+- simuleert verbonden WiFi-stations tijdens lokale ontwikkeling
+- biedt een bestuurbare, thread-safe lijst van mock MAC-adressen
+
+Gebruikt door:
+
+- `MonitoringService` op Windows
+- `DevStations.razor` voor handmatig toevoegen/verwijderen
+
+Belangrijke implementatiedetails:
+
+- deelt state tussen consumers doordat dezelfde singleton instance wordt geregistreerd
+- ondersteunt `AddStation`, `RemoveStation` en `ClearStations`
+- start met twee standaard mock stations
+
+### MonitoringService.cs
+
+Type:
+
+- hosted background service
+
+Verantwoordelijkheid:
+
+- periodiek netwerkstations verwerken
+- connecties en disconnecties detecteren
+- `Connection` en `EventLog` records bijwerken
+- realtime statuswijzigingen broadcasten via `StatusHub`
+
+Gebruikt door:
+
+- runtime background processing, niet direct door een pagina
+
+Belangrijke implementatiedetails:
+
+- maakt per poll een nieuwe scope en `AppDbContext`
+- houdt een in-memory `HashSet<string>` met eerder online MAC-adressen bij
+- reset die set wanneer geen actieve toets aanwezig is
+- logt onbekende MAC-adressen maar stopt de monitoring niet
+
+### MyScreenService.cs
+
+Type:
+
+- scoped applicatieservice
+
+Verantwoordelijkheid:
+
+- status van één student opvragen op basis van MAC-adres
+- bepalen of de student geregistreerd is
+- bepalen of er een open verbinding bestaat
+
+Gebruikt door:
+
+- `MyScreen.razor`
+
+Belangrijke implementatiedetails:
+
+- retourneert een DTO die zowel registratie- als verbindingsstatus bevat
+- houdt geen eigen state bij
+
+### StatusService.cs
+
+Type:
+
+- scoped applicatieservice
+
+Verantwoordelijkheid:
+
+- eenvoudige lijst leveren van momenteel verbonden studenten
+
+Gebruikt door:
+
+- `Status.razor`
+
+Belangrijke implementatiedetails:
+
+- selecteert alleen open `Connection` records
+- projecteert direct naar `ConnectedStudentDto`
+- wordt gebruikt in een pollende UI, niet in een SignalR-client
+
+### StudentRegistrationService.cs
+
+Type:
+
+- scoped applicatieservice
+
+Verantwoordelijkheid:
 
 - actieve toets bepalen
 - studentinput valideren
@@ -185,11 +455,49 @@ Verantwoordelijkheden:
 - student upserten op basis van `MacAddress`
 - resultaat teruggeven via DTO
 
-De pagina `Register.razor` haalt alleen het client-IP op via `IHttpContextAccessor` en delegeert de rest aan deze service.
+Gebruikt door:
 
-### TestManagementService
+- `Register.razor`
 
-Verantwoordelijkheden:
+Belangrijke implementatiedetails:
+
+- voert de actieve-toetscheck opnieuw uit bij submit
+- schrijft `Student.TestName` weg als gededenormaliseerde toetskoppeling
+- kapselt database- en MAC-logica af van de pagina
+
+### TeacherAuthService.cs
+
+Type:
+
+- scoped applicatieservice
+
+Verantwoordelijkheid:
+
+- huidige docentstatus bepalen op basis van cookie-inhoud
+
+Gebruikt door:
+
+- `Home.razor`
+- `Tests.razor`
+- `Status.razor`
+- `Export.razor`
+- `ExportByTest.razor`
+- `TeacherLogin.razor`
+- `NavMenu.razor`
+
+Belangrijke implementatiedetails:
+
+- leest alleen `teacher_auth` cookie uit `HttpContext`
+- login/logout zelf gebeurt niet in deze service maar via POST endpoints in `Program.cs`
+- voorkomt cookie-writes vanuit interactieve componenten
+
+### TestManagementService.cs
+
+Type:
+
+- scoped applicatieservice
+
+Verantwoordelijkheid:
 
 - pagineren en filteren van toetsen
 - aanmaken en wijzigen van toetsen
@@ -198,50 +506,15 @@ Verantwoordelijkheden:
 - een toets deactiveren door `EndTime` terug te zetten
 - open verbindingen sluiten en disconnect-events uitsturen
 
-### DashboardService
+Gebruikt door:
 
-Verantwoordelijkheden:
+- `Tests.razor`
 
-- lijst van toetsen leveren aan het dashboard
-- studenten inclusief online/offline status leveren
-- optioneel filteren op geselecteerde toets
+Belangrijke implementatiedetails:
 
-De filtering op toets gebeurt op basis van `Student.TestName`, dus via een gededenormaliseerde naam en niet via een foreign key op `Student`.
-
-### StatusService
-
-Levert een eenvoudige lijst van alle studenten met een open `Connection`.
-
-### MyScreenService
-
-Levert de status van een individuele student:
-
-- geregistreerd of niet
-- momenteel verbonden of niet
-- naam
-- toetsnaam
-
-### ExportService
-
-Genereert CSV-inhoud in memory en schrijft geen serverbestanden weg.
-
-### DevStationsService
-
-Ondersteunt development-only acceptatietests:
-
-- actieve toets ophalen
-- teststudent aanmaken of bijwerken
-- in combinatie met `MockStationProvider` volledige monitoringflow simuleren
-
-### TeacherAuthService
-
-Docentauthenticatie is bewust simpel gehouden:
-
-- controle op een `HttpOnly` cookie
-- login/logout via echte HTTP POST endpoints in `Program.cs`
-- geen cookie-writes vanuit interactieve componenten
-
-Dit voorkomt Blazor Server-problemen waarbij response headers al gestart zijn.
+- gebruikt `IHubContext<StatusHub>` om disconnects direct naar clients te sturen
+- gebruikt SQL-vertaalbare actieve-toetslogica in queries
+- returnt zowel eenvoudige operation results als een specifiek deactivatieresultaat
 
 ## Infrastructuurkeuzes
 
