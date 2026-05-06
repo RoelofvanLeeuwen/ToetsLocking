@@ -1,6 +1,6 @@
 # Build-artefacten
-bin/
-obj/
+**/bin
+**/obj
 
 # Visual Studio bestanden
 .vs/

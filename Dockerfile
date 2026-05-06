@@ -6,13 +6,13 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
 # Kopieer het projectbestand en herstel dependencies (cache-efficiënt)
-COPY ToetsLockingWifiMonitoring.Web/ToetsLockingWifiMonitoring.Web.csproj ToetsLockingWifiMonitoring.Web/
-RUN dotnet restore ToetsLockingWifiMonitoring.Web/ToetsLockingWifiMonitoring.Web.csproj
+COPY StudentWifiMonitoring.Web/StudentWifiMonitoring.Web.csproj StudentWifiMonitoring.Web/
+RUN dotnet restore StudentWifiMonitoring.Web/StudentWifiMonitoring.Web.csproj
 
 # Kopieer de rest van de broncode en publiceer
-COPY ToetsLockingWifiMonitoring.Web/ ToetsLockingWifiMonitoring.Web/
-WORKDIR /src/ToetsLockingWifiMonitoring.Web
-RUN dotnet publish ToetsLockingWifiMonitoring.Web.csproj \
+COPY StudentWifiMonitoring.Web/ StudentWifiMonitoring.Web/
+WORKDIR /src/StudentWifiMonitoring.Web
+RUN dotnet publish StudentWifiMonitoring.Web.csproj \
     --configuration Release \
     --output /app/publish \
     --no-restore
@@ -41,4 +41,4 @@ COPY --from=build /app/publish .
 # Standaard HTTP-poort (geen HTTPS op de Pi)
 EXPOSE 5000
 
-ENTRYPOINT ["dotnet", "ToetsLockingWifiMonitoring.Web.dll"]
+ENTRYPOINT ["dotnet", "StudentWifiMonitoring.Web.dll"]

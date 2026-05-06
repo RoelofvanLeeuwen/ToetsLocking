@@ -1,0 +1,48 @@
+# docker-compose.local.yml — ToetsLocking lokaal testen op Windows
+#
+# Gebruik: docker compose -f docker-compose.local.yml up -d
+#
+# Dit bestand is ALLEEN bedoeld voor lokaal testen op Windows met Docker Desktop.
+# Gebruik docker-compose.yml voor de Raspberry Pi.
+#
+# Belangrijk: netwerkmonitoring werkt op Windows niet realistisch omdat de app
+# Linux-netwerkcommando's (iw, ip) gebruikt die niet beschikbaar zijn in een
+# Windows/Docker Desktop omgeving. Monitoring__Interface is hier een placeholder.
+
+services:
+  toetslocking:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+
+    ports:
+      # App bereikbaar via http://localhost:5000
+      - "5000:5000"
+
+    environment:
+      # ASP.NET Core omgeving
+      - ASPNETCORE_ENVIRONMENT=Production
+
+      # HTTP-only — luister op poort 5000
+      - ASPNETCORE_URLS=http://+:5000
+
+      # SQLite-database in het gemounte volume
+      - ConnectionStrings__Default=Data Source=/data/app.db
+
+      # Placeholder — netwerkmonitoring werkt niet realistisch op Windows
+      - Monitoring__Interface=eth1
+      - Monitoring__PollSeconds=2
+
+      # Docent-wachtwoord — alleen voor lokaal testen
+      - Teacher__Password=1234
+
+      # Voorkom HTTPS-redirects
+      - ForceHttps=false
+
+    volumes:
+      # Persistente opslag voor de SQLite-database
+      - toetslocking-local-data:/data
+
+volumes:
+  toetslocking-local-data:
