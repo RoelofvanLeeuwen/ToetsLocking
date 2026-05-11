@@ -27,9 +27,14 @@ WORKDIR /app
 # Installeer Linux-tools die nodig zijn voor netwerkmonitoring:
 # - iw: uitlezen van wifi-stations (iw dev wlan0 station dump)
 # - iproute2: ip/arp-commando's voor MAC-adres resolutie
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    network-manager \
+    wireless-tools \
     iw \
     iproute2 \
+    net-tools \
+    util-linux \
     && rm -rf /var/lib/apt/lists/*
 
 # Map voor de SQLite-database (wordt gemount als volume vanuit docker-compose)
