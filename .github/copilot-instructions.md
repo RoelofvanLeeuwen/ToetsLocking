@@ -26,6 +26,7 @@ Copilot moet code voorstellen die:
 ## Werken met bestaande code
 
 - **Wijzig nooit zomaar bestaande werkende code zonder expliciete toestemming van de gebruiker.** Voorkomen dat functionaliteit onbedoeld wijzigt of stopt met werken.
+- Leg altijd het plan voor aan de gebruiker en wacht op goedkeuring voordat wijzigingen worden doorgevoerd.
 - Stel wijzigingen altijd eerst voor voordat je bestaande code aanpast.
 - Als bestaande code moet worden aangepast, leg dan duidelijk uit:
   - Wat er gewijzigd wordt
