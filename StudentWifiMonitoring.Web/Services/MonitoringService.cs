@@ -96,11 +96,66 @@ public class MonitoringService : BackgroundService
             await HandleDisconnectAsync(context, activeSession, mac, cancellationToken);
         }
 
+        // Herstel studenten die al verbonden waren maar geen open verbinding hebben
+        await HandleAlreadyConnectedStudentsAsync(context, activeSession, currentMacs, cancellationToken);
+
         // Update de online macs set
         _onlineMacs.Clear();
         foreach (var mac in currentMacs)
         {
             _onlineMacs.Add(mac);
+        }
+    }
+
+    /// <summary>
+    /// Verwerkt studenten die al verbonden waren met de WiFi vóór of tijdens hun registratie,
+    /// maar daardoor nooit via HandleConnectAsync zijn opgepikt.
+    /// Als een bekend MAC online is zonder open verbinding in de database, wordt alsnog een verbinding aangemaakt.
+    /// </summary>
+    private async Task HandleAlreadyConnectedStudentsAsync(AppDbContext context, TestSession activeSession, HashSet<string> currentMacs, CancellationToken cancellationToken)
+    {
+        if (currentMacs.Count == 0) return;
+
+        // Zoek studenten waarvan het MAC nu online is
+        var onlineStudents = await context.Students
+            .Where(s => currentMacs.Contains(s.MacAddress))
+            .ToListAsync(cancellationToken);
+
+        foreach (var student in onlineStudents)
+        {
+            // Sla over als de student al een open verbinding heeft
+            bool hasOpenConnection = await context.Connections
+                .AnyAsync(c => c.StudentId == student.Id && c.DisconnectedAt == null, cancellationToken);
+
+            if (hasOpenConnection) continue;
+
+            // Student is online maar heeft geen open verbinding - herstel dit
+            _logger.LogInformation("Student {Name} ({MacAddress}) was al verbonden maar had geen open verbinding, alsnog registreren",
+                student.Name, student.MacAddress);
+
+            var now = DateTime.UtcNow;
+            context.Connections.Add(new Connection
+            {
+                StudentId = student.Id,
+                ConnectedAt = now
+            });
+            context.Events.Add(new EventLog
+            {
+                StudentId = student.Id,
+                TestSessionId = activeSession.Id,
+                EventType = EventType.Connected,
+                Timestamp = now
+            });
+
+            await context.SaveChangesAsync(cancellationToken);
+
+            await _hubContext.Clients.All.SendAsync("status", new
+            {
+                mac = student.MacAddress,
+                status = "connected",
+                name = student.Name,
+                testName = activeSession.Name
+            }, cancellationToken);
         }
     }
 
