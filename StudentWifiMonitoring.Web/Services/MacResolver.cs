@@ -23,6 +23,10 @@ public class LinuxMacResolver : IMacResolver
 {
     public string? GetMacForIp(string ipAddress)
     {
+        // IPv4-mapped IPv6-adressen (::ffff:x.x.x.x) omzetten naar gewoon IPv4
+        if (ipAddress.StartsWith("::ffff:", StringComparison.OrdinalIgnoreCase))
+            ipAddress = ipAddress[7..];
+
         try
         {
             var psi = new ProcessStartInfo
@@ -58,6 +62,10 @@ public class WindowsMacResolver : IMacResolver
 {
     public string? GetMacForIp(string ipAddress)
     {
+        // IPv4-mapped IPv6-adressen (::ffff:x.x.x.x) omzetten naar gewoon IPv4
+        if (ipAddress.StartsWith("::ffff:", StringComparison.OrdinalIgnoreCase))
+            ipAddress = ipAddress[7..];
+
         try
         {
             var psi = new ProcessStartInfo
