@@ -24,6 +24,7 @@ public class DashboardService : IDashboardService
     /// </summary>
     public List<TestSessionDto> GetTestSessions()
     {
+        var now = DateTime.UtcNow;
         return _db.TestSessions
             .OrderByDescending(t => t.StartTime)
             .Select(t => new TestSessionDto
@@ -31,7 +32,8 @@ public class DashboardService : IDashboardService
                 Id = t.Id,
                 Name = t.Name,
                 StartTime = t.StartTime,
-                EndTime = t.EndTime
+                EndTime = t.EndTime,
+                IsActive = t.StartTime <= now && t.EndTime >= now
             })
             .ToList();
     }
@@ -45,6 +47,12 @@ public class DashboardService : IDashboardService
     {
         HashSet<string> onlineMacs;
         Dictionary<int, int> disconnectionCounts;
+        Dictionary<int, DateTime> lastConnections;
+
+        lastConnections = _db.Connections
+            .GroupBy(c => c.StudentId)
+            .Select(g => new { StudentId = g.Key, LastConnectedAt = g.Max(c => c.ConnectedAt) })
+            .ToDictionary(x => x.StudentId, x => x.LastConnectedAt);
 
         if (testSessionId.HasValue)
         {
@@ -73,7 +81,8 @@ public class DashboardService : IDashboardService
                     Name = s.Name,
                     TestName = s.TestName,
                     IsOnline = onlineMacs.Contains(s.MacAddress),
-                    DisconnectionCount = disconnectionCounts.GetValueOrDefault(s.Id, 0)
+                    DisconnectionCount = disconnectionCounts.GetValueOrDefault(s.Id, 0),
+                    LastConnectedAt = lastConnections.ContainsKey(s.Id) ? lastConnections[s.Id] : (DateTime?)null
                 })
                 .ToList();
         }
@@ -97,7 +106,8 @@ public class DashboardService : IDashboardService
                     Name = s.Name,
                     TestName = s.TestName,
                     IsOnline = onlineMacs.Contains(s.MacAddress),
-                    DisconnectionCount = disconnectionCounts.GetValueOrDefault(s.Id, 0)
+                    DisconnectionCount = disconnectionCounts.GetValueOrDefault(s.Id, 0),
+                    LastConnectedAt = lastConnections.ContainsKey(s.Id) ? lastConnections[s.Id] : (DateTime?)null
                 })
                 .ToList();
         }

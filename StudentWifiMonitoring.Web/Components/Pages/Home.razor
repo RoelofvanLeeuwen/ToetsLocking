@@ -88,7 +88,7 @@ else
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (StudentStatusDto s in students.OrderBy(st => st.Name))
+                            @foreach (StudentStatusDto s in students.OrderByDescending(st => !st.IsOnline).ThenByDescending(st => st.LastConnectedAt))
                                 {
                                     <tr class="@(s.IsOnline ? "table-success" : "")" style="cursor:pointer" @onclick="() => OpenStudentDetail(s)" title="Klik voor activiteitenlog">
                                         <td>
@@ -203,8 +203,9 @@ else
             return;
         }
 
-        // Laad initiële data
+        // Laad initiële data; selecteer automatisch de actieve toets
         tests = DashboardService.GetTestSessions();
+        selectedTestId = tests.FirstOrDefault(t => t.IsActive)?.Id;
         LoadStudents();
 
         // Setup SignalR verbinding
