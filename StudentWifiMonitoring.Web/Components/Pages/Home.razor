@@ -70,10 +70,20 @@ else
             }
             else if (students.Count == 0)
             {
-                <div class="alert alert-warning">
-                    <strong>Geen studenten gevonden.</strong>
-                    <p class="mb-0">Er zijn nog geen studenten geregistreerd. Ga naar <a href="/register">/register</a> om studenten aan te melden.</p>
-                </div>
+                @if (!selectedTestId.HasValue)
+                {
+                    <div class="alert alert-info">
+                        <strong>Geen actieve toets.</strong>
+                        <p class="mb-0">Selecteer een toets in het dropdown-menu om de studenten te bekijken.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-warning">
+                        <strong>Geen studenten gevonden.</strong>
+                        <p class="mb-0">Er zijn nog geen studenten geregistreerd voor deze toets. Ga naar <a href="/register">/register</a> om studenten aan te melden.</p>
+                    </div>
+                }
             }
             else
             {
@@ -323,9 +333,9 @@ else
                         existingStudent.TestName = payload.TestName;
                     }
                 }
-                else if (!string.IsNullOrEmpty(payload.Name))
+                else if (!string.IsNullOrEmpty(payload.Name) && selectedTestId.HasValue)
                 {
-                    // Voeg nieuwe student toe aan lijst
+                    // Voeg nieuwe student toe aan lijst (alleen als een toets geselecteerd is)
                     students.Add(new StudentStatusDto
                     {
                         MacAddress = payload.Mac,
@@ -348,9 +358,15 @@ else
 
     /// <summary>
     /// Laadt studenten en hun online status uit de database.
+    /// Toont geen studenten als geen toets geselecteerd is.
     /// </summary>
     private void LoadStudents()
     {
+        if (!selectedTestId.HasValue)
+        {
+            students = new List<StudentStatusDto>();
+            return;
+        }
         students = DashboardService.GetStudentsWithStatus(selectedTestId);
     }
 
