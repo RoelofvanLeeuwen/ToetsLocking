@@ -47,12 +47,7 @@ public class DashboardService : IDashboardService
     {
         HashSet<string> onlineMacs;
         Dictionary<int, int> disconnectionCounts;
-        Dictionary<int, DateTime> lastConnections;
-
-        lastConnections = _db.Connections
-            .GroupBy(c => c.StudentId)
-            .Select(g => new { StudentId = g.Key, LastConnectedAt = g.Max(c => c.ConnectedAt) })
-            .ToDictionary(x => x.StudentId, x => x.LastConnectedAt);
+        Dictionary<int, DateTime> lastConnectionEvents;
 
         if (testSessionId.HasValue)
         {
@@ -73,6 +68,13 @@ public class DashboardService : IDashboardService
                 .Select(g => new { StudentId = g.Key, Count = g.Count() })
                 .ToDictionary(x => x.StudentId, x => x.Count);
 
+            // Gebruik EventLog (gefilterd op sessie) voor de meest recente "Verbonden" gebeurtenis
+            lastConnectionEvents = _db.Events
+                .Where(e => e.EventType == EventType.Connected && e.TestSessionId == testSessionId.Value)
+                .GroupBy(e => e.StudentId)
+                .Select(g => new { StudentId = g.Key, LastConnectedAt = g.Max(e => e.Timestamp) })
+                .ToDictionary(x => x.StudentId, x => x.LastConnectedAt);
+
             return _db.Students
                 .Where(s => s.TestName == test.Name)
                 .Select(s => new StudentStatusDto
@@ -82,7 +84,7 @@ public class DashboardService : IDashboardService
                     TestName = s.TestName,
                     IsOnline = onlineMacs.Contains(s.MacAddress),
                     DisconnectionCount = disconnectionCounts.GetValueOrDefault(s.Id, 0),
-                    LastConnectedAt = lastConnections.ContainsKey(s.Id) ? lastConnections[s.Id] : (DateTime?)null
+                    LastConnectedAt = lastConnectionEvents.ContainsKey(s.Id) ? lastConnectionEvents[s.Id] : (DateTime?)null
                 })
                 .ToList();
         }
@@ -99,6 +101,12 @@ public class DashboardService : IDashboardService
                 .Select(g => new { StudentId = g.Key, Count = g.Count() })
                 .ToDictionary(x => x.StudentId, x => x.Count);
 
+            lastConnectionEvents = _db.Events
+                .Where(e => e.EventType == EventType.Connected)
+                .GroupBy(e => e.StudentId)
+                .Select(g => new { StudentId = g.Key, LastConnectedAt = g.Max(e => e.Timestamp) })
+                .ToDictionary(x => x.StudentId, x => x.LastConnectedAt);
+
             return _db.Students
                 .Select(s => new StudentStatusDto
                 {
@@ -107,7 +115,7 @@ public class DashboardService : IDashboardService
                     TestName = s.TestName,
                     IsOnline = onlineMacs.Contains(s.MacAddress),
                     DisconnectionCount = disconnectionCounts.GetValueOrDefault(s.Id, 0),
-                    LastConnectedAt = lastConnections.ContainsKey(s.Id) ? lastConnections[s.Id] : (DateTime?)null
+                    LastConnectedAt = lastConnectionEvents.ContainsKey(s.Id) ? lastConnectionEvents[s.Id] : (DateTime?)null
                 })
                 .ToList();
         }

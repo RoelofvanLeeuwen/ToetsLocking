@@ -308,6 +308,12 @@ else
                         existingStudent.DisconnectionCount++;
                     }
 
+                    // LastConnectedAt bijwerken bij herverbinding zodat sortering actueel blijft
+                    if (!wasOnline && existingStudent.IsOnline)
+                    {
+                        existingStudent.LastConnectedAt = DateTime.UtcNow;
+                    }
+
                     if (!string.IsNullOrEmpty(payload.Name) && existingStudent.Name != payload.Name)
                     {
                         existingStudent.Name = payload.Name;
