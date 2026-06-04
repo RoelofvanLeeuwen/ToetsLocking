@@ -1,5 +1,6 @@
 ﻿@page "/"
 @using Microsoft.AspNetCore.SignalR.Client
+@using StudentWifiMonitoring.Web.Domain
 @using StudentWifiMonitoring.Web.DTOs.Dashboard
 @using StudentWifiMonitoring.Web.DTOs.Tests
 @using StudentWifiMonitoring.Web.Services.Interfaces
@@ -89,7 +90,7 @@ else
                         <tbody>
                             @foreach (StudentStatusDto s in students.OrderBy(st => st.Name))
                                 {
-                                    <tr class="@(s.IsOnline ? "table-success" : "")">
+                                    <tr class="@(s.IsOnline ? "table-success" : "")" style="cursor:pointer" @onclick="() => OpenStudentDetail(s)" title="Klik voor activiteitenlog">
                                         <td>
                                             @if (s.IsOnline)
                                             {
@@ -98,6 +99,10 @@ else
                                             else
                                             {
                                                 <span class="badge bg-secondary">⚪ Niet verbonden</span>
+                                            }
+                                            @if (s.DisconnectionCount > 0)
+                                            {
+                                                <span class="badge bg-warning text-dark ms-1" title="@s.DisconnectionCount keer verbroken">⚠️ @s.DisconnectionCount×</span>
                                             }
                                         </td>
                                         <td><strong>@s.Name</strong></td>
@@ -120,6 +125,52 @@ else
         </div>
     </div>
 </div>
+
+@if (selectedStudent != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5)" @onclick="CloseStudentDetail">
+        <div class="modal-dialog modal-lg" @onclick:stopPropagation="true">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Activiteiten — @selectedStudent.Name</h5>
+                    <button type="button" class="btn-close" @onclick="CloseStudentDetail"></button>
+                </div>
+                <div class="modal-body">
+                    @if (studentActivity == null || !studentActivity.Any())
+                    {
+                        <p class="text-muted">Geen activiteiten gevonden voor deze student.</p>
+                    }
+                    else
+                    {
+                        <table class="table table-sm mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Tijdstip</th>
+                                    <th>Gebeurtenis</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (StudentActivityDto a in studentActivity)
+                                {
+                                    <tr class="@(a.EventType == EventType.Disconnected ? "table-warning" : "table-success")">
+                                        <td>@a.Timestamp.ToLocalTime().ToString("HH:mm:ss")</td>
+                                        <td>@(a.EventType == EventType.Disconnected ? "🔴 Verbinding verbroken" : "🟢 Verbonden")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <small class="text-muted me-auto">
+                        @(studentActivity?.Count(a => a.EventType == EventType.Disconnected) ?? 0) verbroken verbinding(en)
+                    </small>
+                    <button type="button" class="btn btn-secondary" @onclick="CloseStudentDetail">Sluiten</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
 }
 
 @code {
@@ -131,6 +182,8 @@ else
     private HubConnection? hubConnection;
     private string? _connectionStatus;
     private bool _isConnected;
+    private StudentStatusDto? selectedStudent;
+    private List<StudentActivityDto>? studentActivity;
 
     protected override async Task OnInitializedAsync()
     {
@@ -245,7 +298,14 @@ else
                 if (existingStudent != null)
                 {
                     // Update online status en gegevens als deze gewijzigd zijn
+                    bool wasOnline = existingStudent.IsOnline;
                     existingStudent.IsOnline = payload.Status == "connected";
+
+                    // Teller ophogen bij nieuwe verbreking
+                    if (wasOnline && !existingStudent.IsOnline)
+                    {
+                        existingStudent.DisconnectionCount++;
+                    }
 
                     if (!string.IsNullOrEmpty(payload.Name) && existingStudent.Name != payload.Name)
                     {
@@ -293,6 +353,18 @@ else
     private void OnTestChanged()
     {
         LoadStudents();
+    }
+
+    private void OpenStudentDetail(StudentStatusDto student)
+    {
+        selectedStudent = student;
+        studentActivity = DashboardService.GetStudentActivity(student.MacAddress, selectedTestId);
+    }
+
+    private void CloseStudentDetail()
+    {
+        selectedStudent = null;
+        studentActivity = null;
     }
 
     /// <summary>

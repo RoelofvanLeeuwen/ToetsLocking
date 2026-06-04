@@ -1,4 +1,5 @@
 using StudentWifiMonitoring.Web.Data;
+using StudentWifiMonitoring.Web.Domain;
 using StudentWifiMonitoring.Web.DTOs.Dashboard;
 using StudentWifiMonitoring.Web.DTOs.Tests;
 using StudentWifiMonitoring.Web.Services.Interfaces;
@@ -39,11 +40,11 @@ public class DashboardService : IDashboardService
     /// Haalt studenten met hun online status op als DTO's, optioneel gefilterd op een specifieke toetssessie.
     /// </summary>
     /// <param name="testSessionId">Optioneel: ID van de toetssessie om op te filteren.</param>
-    /// <returns>Lijst van student status DTO's inclusief online indicator.</returns>
+    /// <returns>Lijst van student status DTO's inclusief online indicator en aantal verbroken verbindingen.</returns>
     public List<StudentStatusDto> GetStudentsWithStatus(int? testSessionId)
     {
-        List<string> studentMacs;
         HashSet<string> onlineMacs;
+        Dictionary<int, int> disconnectionCounts;
 
         if (testSessionId.HasValue)
         {
@@ -53,15 +54,16 @@ public class DashboardService : IDashboardService
                 return new List<StudentStatusDto>();
             }
 
-            studentMacs = _db.Students
-                .Where(s => s.TestName == test.Name)
-                .Select(s => s.MacAddress)
-                .ToList();
-
             onlineMacs = _db.Connections
                 .Where(c => c.DisconnectedAt == null && c.Student!.TestName == test.Name)
                 .Select(c => c.Student!.MacAddress)
                 .ToHashSet();
+
+            disconnectionCounts = _db.Events
+                .Where(e => e.EventType == EventType.Disconnected && e.TestSessionId == testSessionId.Value)
+                .GroupBy(e => e.StudentId)
+                .Select(g => new { StudentId = g.Key, Count = g.Count() })
+                .ToDictionary(x => x.StudentId, x => x.Count);
 
             return _db.Students
                 .Where(s => s.TestName == test.Name)
@@ -70,7 +72,8 @@ public class DashboardService : IDashboardService
                     MacAddress = s.MacAddress,
                     Name = s.Name,
                     TestName = s.TestName,
-                    IsOnline = onlineMacs.Contains(s.MacAddress)
+                    IsOnline = onlineMacs.Contains(s.MacAddress),
+                    DisconnectionCount = disconnectionCounts.GetValueOrDefault(s.Id, 0)
                 })
                 .ToList();
         }
@@ -81,15 +84,43 @@ public class DashboardService : IDashboardService
                 .Select(c => c.Student!.MacAddress)
                 .ToHashSet();
 
+            disconnectionCounts = _db.Events
+                .Where(e => e.EventType == EventType.Disconnected)
+                .GroupBy(e => e.StudentId)
+                .Select(g => new { StudentId = g.Key, Count = g.Count() })
+                .ToDictionary(x => x.StudentId, x => x.Count);
+
             return _db.Students
                 .Select(s => new StudentStatusDto
                 {
                     MacAddress = s.MacAddress,
                     Name = s.Name,
                     TestName = s.TestName,
-                    IsOnline = onlineMacs.Contains(s.MacAddress)
+                    IsOnline = onlineMacs.Contains(s.MacAddress),
+                    DisconnectionCount = disconnectionCounts.GetValueOrDefault(s.Id, 0)
                 })
                 .ToList();
         }
+    }
+
+    /// <summary>
+    /// Haalt de volledige activiteitenlog op van een student, optioneel gefilterd op een toetssessie.
+    /// </summary>
+    public List<StudentActivityDto> GetStudentActivity(string macAddress, int? testSessionId)
+    {
+        var query = _db.Events
+            .Where(e => e.Student!.MacAddress == macAddress);
+
+        if (testSessionId.HasValue)
+            query = query.Where(e => e.TestSessionId == testSessionId.Value);
+
+        return query
+            .OrderBy(e => e.Timestamp)
+            .Select(e => new StudentActivityDto
+            {
+                Timestamp = e.Timestamp,
+                EventType = e.EventType
+            })
+            .ToList();
     }
 }

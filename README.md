@@ -17,6 +17,7 @@ De applicatie is bedoeld voor:
 - Studentregistratie voor een actieve toets
 - Koppeling tussen student en apparaat op basis van MAC-adres
 - Live monitoring van connect/disconnect tijdens een actieve toets
+- Bijhouden van verbindingshistorie per student: teller van verbroken verbindingen zichtbaar in dashboard, volledige activiteitenlog op klik
 - Docentdashboard met statusinformatie via SignalR
 - Toetsbeheer met zoeken, sorteren en paginatie
 - CSV-export direct in memory, zonder bestanden op de server achter te laten

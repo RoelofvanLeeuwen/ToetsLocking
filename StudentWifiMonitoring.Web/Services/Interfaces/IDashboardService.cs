@@ -20,4 +20,9 @@ public interface IDashboardService
     /// <param name="testSessionId">Optioneel: ID van de toetssessie om op te filteren.</param>
     /// <returns>Lijst van student status DTO's inclusief online indicator.</returns>
     List<StudentStatusDto> GetStudentsWithStatus(int? testSessionId);
+
+    /// <summary>
+    /// Haalt de volledige activiteitenlog op van een student, optioneel gefilterd op een toetssessie.
+    /// </summary>
+    List<StudentActivityDto> GetStudentActivity(string macAddress, int? testSessionId);
 }
