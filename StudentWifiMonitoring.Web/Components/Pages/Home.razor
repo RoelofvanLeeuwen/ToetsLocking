@@ -34,7 +34,7 @@ else
             <div class="mb-3">
                 <label class="form-label">Selecteer Toets:</label>
                 <select class="form-select" @bind="selectedTestId" @bind:after="OnTestChanged">
-                    <option value="">-- Alle toetsen --</option>
+                    <option value="">-</option>
                     @foreach (TestSessionDto t in tests)
                     {
                         <option value="@t.Id">@t.Name (@t.StartTime.ToLocalTime():HH:mm) - (@t.EndTime.ToLocalTime():HH:mm))</option>
@@ -70,10 +70,20 @@ else
             }
             else if (students.Count == 0)
             {
-                <div class="alert alert-warning">
-                    <strong>Geen studenten gevonden.</strong>
-                    <p class="mb-0">Er zijn nog geen studenten geregistreerd. Ga naar <a href="/register">/register</a> om studenten aan te melden.</p>
-                </div>
+                @if (!selectedTestId.HasValue)
+                {
+                    <div class="alert alert-info">
+                        <strong>Geen actieve toets.</strong>
+                        <p class="mb-0">Selecteer een toets in het dropdown-menu om de studenten te bekijken.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-warning">
+                        <strong>Geen studenten gevonden.</strong>
+                        <p class="mb-0">Er zijn nog geen studenten geregistreerd voor deze toets. Ga naar <a href="/register">/register</a> om studenten aan te melden.</p>
+                    </div>
+                }
             }
             else
             {
@@ -88,7 +98,7 @@ else
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (StudentStatusDto s in students.OrderBy(st => st.Name))
+                            @foreach (StudentStatusDto s in students.OrderByDescending(st => !st.IsOnline).ThenByDescending(st => st.LastConnectedAt))
                                 {
                                     <tr class="@(s.IsOnline ? "table-success" : "")" style="cursor:pointer" @onclick="() => OpenStudentDetail(s)" title="Klik voor activiteitenlog">
                                         <td>
@@ -203,8 +213,9 @@ else
             return;
         }
 
-        // Laad initiële data
+        // Laad initiële data; selecteer automatisch de actieve toets
         tests = DashboardService.GetTestSessions();
+        selectedTestId = tests.FirstOrDefault(t => t.IsActive)?.Id;
         LoadStudents();
 
         // Setup SignalR verbinding
@@ -307,6 +318,12 @@ else
                         existingStudent.DisconnectionCount++;
                     }
 
+                    // LastConnectedAt bijwerken bij herverbinding zodat sortering actueel blijft
+                    if (!wasOnline && existingStudent.IsOnline)
+                    {
+                        existingStudent.LastConnectedAt = DateTime.UtcNow;
+                    }
+
                     if (!string.IsNullOrEmpty(payload.Name) && existingStudent.Name != payload.Name)
                     {
                         existingStudent.Name = payload.Name;
@@ -316,9 +333,9 @@ else
                         existingStudent.TestName = payload.TestName;
                     }
                 }
-                else if (!string.IsNullOrEmpty(payload.Name))
+                else if (!string.IsNullOrEmpty(payload.Name) && selectedTestId.HasValue)
                 {
-                    // Voeg nieuwe student toe aan lijst
+                    // Voeg nieuwe student toe aan lijst (alleen als een toets geselecteerd is)
                     students.Add(new StudentStatusDto
                     {
                         MacAddress = payload.Mac,
@@ -341,9 +358,15 @@ else
 
     /// <summary>
     /// Laadt studenten en hun online status uit de database.
+    /// Toont geen studenten als geen toets geselecteerd is.
     /// </summary>
     private void LoadStudents()
     {
+        if (!selectedTestId.HasValue)
+        {
+            students = new List<StudentStatusDto>();
+            return;
+        }
         students = DashboardService.GetStudentsWithStatus(selectedTestId);
     }
 

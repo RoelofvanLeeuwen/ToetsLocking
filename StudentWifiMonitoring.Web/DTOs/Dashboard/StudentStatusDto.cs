@@ -29,4 +29,9 @@ public class StudentStatusDto
     /// Aantal keren dat de verbinding verbroken is tijdens de huidige toetssessie.
     /// </summary>
     public int DisconnectionCount { get; set; }
+
+    /// <summary>
+    /// Tijdstip van de meest recente verbinding (voor sortering).
+    /// </summary>
+    public DateTime? LastConnectedAt { get; set; }
 }
