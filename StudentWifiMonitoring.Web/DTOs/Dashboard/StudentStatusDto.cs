@@ -24,4 +24,9 @@ public class StudentStatusDto
     /// Geeft aan of de student momenteel verbonden is.
     /// </summary>
     public bool IsOnline { get; set; }
+
+    /// <summary>
+    /// Aantal keren dat de verbinding verbroken is tijdens de huidige toetssessie.
+    /// </summary>
+    public int DisconnectionCount { get; set; }
 }

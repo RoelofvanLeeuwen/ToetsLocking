@@ -218,6 +218,8 @@ Belangrijke implementatiedetails:
 
 - bepaalt online status op basis van open `Connection` records
 - filtert studenten per toets via `Student.TestName`
+- telt het aantal verbroken verbindingen per student via `EventLog`
+- levert via `GetStudentActivity` de volledige activiteitenlog van een student, optioneel gefilterd op toetssessie
 - retourneert DTO's en geen EF-entiteiten
 
 ### DevelopmentMacResolverDecorator.cs
