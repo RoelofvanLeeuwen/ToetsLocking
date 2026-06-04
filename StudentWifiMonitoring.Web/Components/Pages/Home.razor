@@ -34,7 +34,7 @@ else
             <div class="mb-3">
                 <label class="form-label">Selecteer Toets:</label>
                 <select class="form-select" @bind="selectedTestId" @bind:after="OnTestChanged">
-                    <option value="">-- Alle toetsen --</option>
+                    <option value="">-</option>
                     @foreach (TestSessionDto t in tests)
                     {
                         <option value="@t.Id">@t.Name (@t.StartTime.ToLocalTime():HH:mm) - (@t.EndTime.ToLocalTime():HH:mm))</option>
