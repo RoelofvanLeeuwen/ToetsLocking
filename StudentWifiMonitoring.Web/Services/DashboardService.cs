@@ -25,7 +25,9 @@ public class DashboardService : IDashboardService
     public List<TestSessionDto> GetTestSessions()
     {
         var now = DateTime.UtcNow;
+        var cutoff = now.AddDays(-14);
         return _db.TestSessions
+            .Where(t => t.StartTime >= cutoff)
             .OrderByDescending(t => t.StartTime)
             .Select(t => new TestSessionDto
             {
