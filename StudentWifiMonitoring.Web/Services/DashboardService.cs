@@ -59,19 +59,13 @@ public class DashboardService : IDashboardService
                 return new List<StudentStatusDto>();
             }
 
-            // Alleen verbindingen die open zijn EN gekoppeld zijn aan deze specifieke sessie
-            // tellen als "online". Verbindingen van verlopen toetsen (geen DisconnectedAt maar
-            // wel een andere sessie) worden zo uitgesloten — zelfde patroon als MyScreenService.
-            var sessionStudentIds = _db.Events
-                .Where(e => e.TestSessionId == testSessionId.Value)
-                .Select(e => e.StudentId)
-                .Distinct()
-                .ToHashSet();
-
+            // Alleen verbindingen die open zijn én gestart zijn vanaf de starttijd van deze sessie
+            // tellen als "online". Stale open verbindingen van verlopen toetsen (ConnectedAt vóór
+            // test.StartTime) worden zo uitgesloten — zelfde principe als de groen-scherm fix.
             onlineMacs = _db.Connections
                 .Where(c => c.DisconnectedAt == null
                             && c.Student!.TestName == test.Name
-                            && sessionStudentIds.Contains(c.StudentId))
+                            && c.ConnectedAt >= test.StartTime)
                 .Select(c => c.Student!.MacAddress)
                 .ToHashSet();
 

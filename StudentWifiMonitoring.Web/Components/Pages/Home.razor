@@ -292,16 +292,53 @@ else
 
     /// <summary>
     /// Verwerkt een realtime status update van MonitoringService via SignalR.
-    /// Herlaadt altijd vanuit de DB zodat de UI de werkelijke staat weerspiegelt
-    /// en niet kan divergeren door race conditions of stale in-memory state.
     /// </summary>
     private async Task HandleStatusUpdateAsync(StatusUpdatePayload payload)
     {
-        await InvokeAsync(() =>
+        try
         {
-            LoadStudents();
-            StateHasChanged();
-        });
+            if (string.IsNullOrEmpty(payload.Mac) || string.IsNullOrEmpty(payload.Status))
+                return;
+
+            if (students != null)
+            {
+                StudentStatusDto? existingStudent = students.FirstOrDefault(s => s.MacAddress == payload.Mac);
+
+                if (existingStudent != null)
+                {
+                    bool wasOnline = existingStudent.IsOnline;
+                    existingStudent.IsOnline = payload.Status == "connected";
+
+                    if (wasOnline && !existingStudent.IsOnline)
+                        existingStudent.DisconnectionCount++;
+
+                    if (!wasOnline && existingStudent.IsOnline)
+                        existingStudent.LastConnectedAt = DateTime.UtcNow;
+
+                    if (!string.IsNullOrEmpty(payload.Name) && existingStudent.Name != payload.Name)
+                        existingStudent.Name = payload.Name;
+
+                    if (!string.IsNullOrEmpty(payload.TestName) && existingStudent.TestName != payload.TestName)
+                        existingStudent.TestName = payload.TestName;
+                }
+                else if (!string.IsNullOrEmpty(payload.Name) && selectedTestId.HasValue)
+                {
+                    students.Add(new StudentStatusDto
+                    {
+                        MacAddress = payload.Mac,
+                        Name = payload.Name,
+                        TestName = payload.TestName ?? "Onbekend",
+                        IsOnline = payload.Status == "connected"
+                    });
+                }
+            }
+
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Fout bij verwerken status update: {ex.Message}");
+        }
     }
 
     /// <summary>
