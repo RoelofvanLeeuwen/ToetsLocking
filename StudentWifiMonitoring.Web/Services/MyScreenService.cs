@@ -36,13 +36,24 @@ public class MyScreenService : IMyScreenService
             };
         }
 
-        var hasOpenConnection = await _db.Connections
-            .AnyAsync(c => c.StudentId == student.Id && c.DisconnectedAt == null);
+        var now = DateTime.UtcNow;
+        var activeSession = await _db.TestSessions
+            .FirstOrDefaultAsync(ts => ts.StartTime <= now && ts.EndTime >= now);
+
+        // Alleen verbonden als er een actieve toets is, de student daarvoor geregistreerd is,
+        // én een open verbinding heeft. Voorkomt groen scherm door een open verbinding van een
+        // verlopen toets waarvan de EndTime stilzwijgend verstreken is.
+        bool isConnected = false;
+        if (activeSession != null && student.TestName == activeSession.Name)
+        {
+            isConnected = await _db.Connections
+                .AnyAsync(c => c.StudentId == student.Id && c.DisconnectedAt == null);
+        }
 
         return new StudentConnectionStatusDto
         {
             IsRegistered = true,
-            IsConnected = hasOpenConnection,
+            IsConnected = isConnected,
             Name = student.Name,
             TestName = student.TestName
         };
