@@ -4,7 +4,6 @@
 @using StudentWifiMonitoring.Web.DTOs.Dashboard
 @using StudentWifiMonitoring.Web.DTOs.Tests
 @using StudentWifiMonitoring.Web.Services.Interfaces
-@rendermode InteractiveServer
 @inject IDashboardService DashboardService
 @inject ITeacherAuthService TeacherAuth
 @inject PersistentComponentState AppState
@@ -220,6 +219,9 @@ else
 
         // Setup SignalR verbinding
         await SetupSignalRConnectionAsync();
+
+        // Herlaad na verbinden om events te missen tijdens navigatie te compenseren
+        LoadStudents();
     }
 
     private Task PersistAuthState()
