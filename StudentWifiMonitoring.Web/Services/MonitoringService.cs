@@ -19,6 +19,7 @@ public class MonitoringService : BackgroundService
     private readonly ILogger<MonitoringService> _logger;
     private readonly int _pollSeconds;
     private readonly HashSet<string> _onlineMacs = new();
+    private bool _hadActiveSession = false;
 
     public MonitoringService(
         IServiceProvider serviceProvider,
@@ -73,10 +74,28 @@ public class MonitoringService : BackgroundService
 
         if (activeSession == null)
         {
-            // Geen actieve toets, reset de online macs en stop
+            // Bij overgang van actief naar geen toets: sluit alle open verbindingen.
+            // Zonder dit blijven verbindingen eeuwig open staan als een toets afloopt
+            // terwijl een student nog op het WiFi zit.
+            if (_hadActiveSession)
+            {
+                var openConnections = await context.Connections
+                    .Where(c => c.DisconnectedAt == null)
+                    .ToListAsync(cancellationToken);
+                if (openConnections.Count > 0)
+                {
+                    var closeTime = DateTime.UtcNow;
+                    foreach (var conn in openConnections)
+                        conn.DisconnectedAt = closeTime;
+                    await context.SaveChangesAsync(cancellationToken);
+                    _logger.LogInformation("{Count} open verbinding(en) gesloten na aflopen toetssessie", openConnections.Count);
+                }
+                _hadActiveSession = false;
+            }
             _onlineMacs.Clear();
             return;
         }
+        _hadActiveSession = true;
 
         // Haal huidige verbonden stations op
         var stations = await _stationProvider.GetStationsAsync();
@@ -175,6 +194,15 @@ public class MonitoringService : BackgroundService
 
         var now = DateTime.UtcNow;
 
+        // Sluit eventuele stale open verbindingen van vorige sessies voordat we een nieuwe aanmaken.
+        // HandleConnectAsync wordt aangeroepen als een MAC opnieuw verschijnt na een periode offline —
+        // een al-open verbinding is dan een overblijfsel van een verlopen toets.
+        var staleConnections = await context.Connections
+            .Where(c => c.StudentId == student.Id && c.DisconnectedAt == null)
+            .ToListAsync(cancellationToken);
+        foreach (var stale in staleConnections)
+            stale.DisconnectedAt = now;
+
         // Voeg nieuwe verbinding toe
         var connection = new Connection
         {
@@ -224,16 +252,13 @@ public class MonitoringService : BackgroundService
 
         var now = DateTime.UtcNow;
 
-        // Zoek de laatste open verbinding
-        var openConnection = await context.Connections
+        // Sluit alle open verbindingen voor deze student — er zou er normaal maar één zijn,
+        // maar meerdere zijn mogelijk als een vorige sessie niet netjes is afgesloten.
+        var openConnections = await context.Connections
             .Where(c => c.StudentId == student.Id && c.DisconnectedAt == null)
-            .OrderByDescending(c => c.ConnectedAt)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (openConnection != null)
-        {
-            openConnection.DisconnectedAt = now;
-        }
+            .ToListAsync(cancellationToken);
+        foreach (var conn in openConnections)
+            conn.DisconnectedAt = now;
 
         // Voeg event log toe
         var eventLog = new EventLog
