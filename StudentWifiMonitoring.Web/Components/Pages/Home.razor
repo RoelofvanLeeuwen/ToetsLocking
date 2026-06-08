@@ -292,70 +292,16 @@ else
 
     /// <summary>
     /// Verwerkt een realtime status update van MonitoringService via SignalR.
+    /// Herlaadt altijd vanuit de DB zodat de UI de werkelijke staat weerspiegelt
+    /// en niet kan divergeren door race conditions of stale in-memory state.
     /// </summary>
     private async Task HandleStatusUpdateAsync(StatusUpdatePayload payload)
     {
-        try
+        await InvokeAsync(() =>
         {
-            // Valideer payload
-            if (string.IsNullOrEmpty(payload.Mac) || string.IsNullOrEmpty(payload.Status))
-            {
-                return;
-            }
-
-            // Controleer of student al bestaat in lijst
-            if (students != null)
-            {
-                StudentStatusDto? existingStudent = students.FirstOrDefault(s => s.MacAddress == payload.Mac);
-
-                if (existingStudent != null)
-                {
-                    // Update online status en gegevens als deze gewijzigd zijn
-                    bool wasOnline = existingStudent.IsOnline;
-                    existingStudent.IsOnline = payload.Status == "connected";
-
-                    // Teller ophogen bij nieuwe verbreking
-                    if (wasOnline && !existingStudent.IsOnline)
-                    {
-                        existingStudent.DisconnectionCount++;
-                    }
-
-                    // LastConnectedAt bijwerken bij herverbinding zodat sortering actueel blijft
-                    if (!wasOnline && existingStudent.IsOnline)
-                    {
-                        existingStudent.LastConnectedAt = DateTime.UtcNow;
-                    }
-
-                    if (!string.IsNullOrEmpty(payload.Name) && existingStudent.Name != payload.Name)
-                    {
-                        existingStudent.Name = payload.Name;
-                    }
-                    if (!string.IsNullOrEmpty(payload.TestName) && existingStudent.TestName != payload.TestName)
-                    {
-                        existingStudent.TestName = payload.TestName;
-                    }
-                }
-                else if (!string.IsNullOrEmpty(payload.Name) && selectedTestId.HasValue)
-                {
-                    // Voeg nieuwe student toe aan lijst (alleen als een toets geselecteerd is)
-                    students.Add(new StudentStatusDto
-                    {
-                        MacAddress = payload.Mac,
-                        Name = payload.Name,
-                        TestName = payload.TestName ?? "Onbekend",
-                        IsOnline = payload.Status == "connected"
-                    });
-                }
-            }
-
-            // Trigger UI update op Blazor thread
-            await InvokeAsync(StateHasChanged);
-        }
-        catch (Exception ex)
-        {
-            // Log fout maar crash niet de UI
-            Console.WriteLine($"Fout bij verwerken status update: {ex.Message}");
-        }
+            LoadStudents();
+            StateHasChanged();
+        });
     }
 
     /// <summary>
