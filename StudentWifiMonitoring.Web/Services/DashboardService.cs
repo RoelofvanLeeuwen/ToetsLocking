@@ -59,8 +59,13 @@ public class DashboardService : IDashboardService
                 return new List<StudentStatusDto>();
             }
 
+            // Alleen verbindingen die open zijn én gestart zijn vanaf de starttijd van deze sessie
+            // tellen als "online". Stale open verbindingen van verlopen toetsen (ConnectedAt vóór
+            // test.StartTime) worden zo uitgesloten — zelfde principe als de groen-scherm fix.
             onlineMacs = _db.Connections
-                .Where(c => c.DisconnectedAt == null && c.Student!.TestName == test.Name)
+                .Where(c => c.DisconnectedAt == null
+                            && c.Student!.TestName == test.Name
+                            && c.ConnectedAt >= test.StartTime)
                 .Select(c => c.Student!.MacAddress)
                 .ToHashSet();
 
