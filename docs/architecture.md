@@ -173,6 +173,8 @@ Clients die luisteren:
 
 `Status.razor` gebruikt geen SignalR, maar pollt elke 3 seconden via `PeriodicTimer`.
 
+`Home.razor` laadt studentdata twee keer in `OnInitializedAsync`: eerst vóór de SignalR-verbinding (initiële snapshot) en daarna opnieuw ná de verbinding (finale snapshot). Dat voorkomt een race waarbij een snel binnenkomend `"connected"`-event van `HandleAlreadyConnectedStudentsAsync` de correcte offline-status overschrijft die zojuist uit de database was gelezen.
+
 ## Services per bestand
 
 Deze sectie beschrijft expliciet de verantwoordelijkheid van elk `.cs` bestand in `StudentWifiMonitoring.Web/Services`.
@@ -401,6 +403,7 @@ Belangrijke implementatiedetails:
 - houdt een in-memory `HashSet<string>` met eerder online MAC-adressen bij
 - reset die set wanneer geen actieve toets aanwezig is
 - logt onbekende MAC-adressen maar stopt de monitoring niet
+- `HandleAlreadyConnectedStudentsAsync` herstelt verbindingen voor studenten waarvan het MAC-adres zichtbaar is op WiFi maar die geen open `Connection` record hebben; dit stuurt opnieuw een `"connected"` SignalR-event en kan dashboard-state overschrijven
 
 ### MyScreenService.cs
 
