@@ -17,57 +17,68 @@
     body, html {
         margin: 0;
         padding: 0;
-        overflow: hidden;
     }
-    
+
     .fullscreen-status {
-        width: 100vw;
-        height: 100vh;
+        width: 100%;
+        min-height: 100dvh;
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
         text-align: center;
+        padding: 24px 16px;
+        box-sizing: border-box;
         transition: background-color 0.5s ease;
     }
-    
+
     .status-connected {
         background-color: #28a745;
         color: white;
     }
-    
+
     .status-disconnected {
         background-color: #dc3545;
         color: white;
     }
-    
+
+    .status-complete {
+        background-color: #17a2b8;
+        color: white;
+    }
+
     .status-icon {
-        font-size: 120px;
-        margin-bottom: 30px;
+        font-size: clamp(60px, 15vw, 120px);
+        margin-bottom: clamp(15px, 3vw, 30px);
+        line-height: 1;
     }
-    
+
     .status-title {
-        font-size: 48px;
+        font-size: clamp(28px, 8vw, 48px);
         font-weight: bold;
-        margin-bottom: 20px;
+        margin-bottom: clamp(10px, 2vw, 20px);
     }
-    
+
     .status-message {
-        font-size: 32px;
-        margin-bottom: 15px;
+        font-size: clamp(16px, 5vw, 32px);
+        margin-bottom: clamp(8px, 1.5vw, 15px);
+        padding: 0 8px;
     }
-    
+
     .status-details {
-        font-size: 24px;
+        font-size: clamp(14px, 4vw, 24px);
         opacity: 0.9;
-        margin-top: 20px;
+        margin-top: clamp(10px, 2vw, 20px);
+        line-height: 1.6;
     }
-    
+
     .status-mac {
         font-family: monospace;
-        font-size: 20px;
+        font-size: clamp(11px, 2.5vw, 20px);
         opacity: 0.7;
-        margin-top: 40px;
+        margin-top: clamp(20px, 4vw, 40px);
+        word-break: break-all;
+        padding: 0 8px;
     }
 
     .signalr-indicator {
@@ -80,24 +91,21 @@
         background-color: rgba(0, 0, 0, 0.3);
     }
 
-    .status-complete {
-        background-color: #17a2b8;
-        color: white;
-    }
-
     .btn-klaar {
-        font-size: 28px;
-        padding: 16px 48px;
-        margin-top: 40px;
+        font-size: clamp(18px, 5vw, 28px);
+        padding: clamp(10px, 2.5vw, 16px) clamp(24px, 8vw, 48px);
+        margin-top: clamp(20px, 5vw, 40px);
         border-radius: 12px;
         background-color: white;
         color: #28a745;
         border: none;
         font-weight: bold;
         cursor: pointer;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
     }
 
-    .btn-klaar:hover {
+    .btn-klaar:hover, .btn-klaar:active {
         background-color: #f0f0f0;
     }
 </style>
