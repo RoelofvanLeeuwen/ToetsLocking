@@ -8,6 +8,9 @@
 @inject ITeacherAuthService TeacherAuth
 @inject PersistentComponentState AppState
 @inject NavigationManager Nav
+@inject IHttpContextAccessor HttpContextAccessor
+@inject StudentWifiMonitoring.Web.Services.IMacResolver MacResolver
+@inject StudentWifiMonitoring.Web.Services.Interfaces.IMyScreenService MyScreenService
 @implements IAsyncDisposable
 
 <PageTitle>Docent Dashboard</PageTitle>
@@ -213,6 +216,18 @@ else
 
         if (!isTeacher)
         {
+            var ip = HttpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
+            if (!string.IsNullOrEmpty(ip))
+            {
+                var mac = MacResolver.GetMacForIp(ip);
+                if (!string.IsNullOrEmpty(mac))
+                {
+                    var status = await MyScreenService.GetStudentConnectionStatusAsync(mac);
+                    Nav.NavigateTo(status.IsConnected && !status.IsTestComplete ? "/myscreen" : "/register");
+                    return;
+                }
+            }
+            Nav.NavigateTo("/register");
             return;
         }
 

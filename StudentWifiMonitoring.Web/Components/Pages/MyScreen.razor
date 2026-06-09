@@ -9,6 +9,7 @@
 @inject IHttpContextAccessor HttpContextAccessor
 @inject NavigationManager Nav
 @inject IWebHostEnvironment Environment
+@inject StudentWifiMonitoring.Web.Services.StudentNavStateService NavState
 @implements IAsyncDisposable
 
 <PageTitle>Mijn Verbindingsstatus</PageTitle>
@@ -402,6 +403,7 @@ else
         await MyScreenService.MarkTestCompleteAsync(_macAddress);
         _isConnected = false;
         _isTestComplete = true;
+        NavState.SetCanRegister(true);
         await InvokeAsync(StateHasChanged);
     }
 
