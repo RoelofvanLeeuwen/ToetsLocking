@@ -1,7 +1,9 @@
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using StudentWifiMonitoring.Web.Data;
 using StudentWifiMonitoring.Web.Domain;
 using StudentWifiMonitoring.Web.DTOs.Students;
+using StudentWifiMonitoring.Web.Hubs;
 using StudentWifiMonitoring.Web.Services.Interfaces;
 
 namespace StudentWifiMonitoring.Web.Services;
@@ -14,15 +16,18 @@ public class StudentRegistrationService : IStudentRegistrationService
 {
     private readonly AppDbContext _db;
     private readonly IMacResolver _macResolver;
+    private readonly IHubContext<StatusHub> _hubContext;
     private readonly ILogger<StudentRegistrationService> _logger;
 
     public StudentRegistrationService(
         AppDbContext db,
         IMacResolver macResolver,
+        IHubContext<StatusHub> hubContext,
         ILogger<StudentRegistrationService> logger)
     {
         _db = db;
         _macResolver = macResolver;
+        _hubContext = hubContext;
         _logger = logger;
     }
 
@@ -108,29 +113,45 @@ public class StudentRegistrationService : IStudentRegistrationService
             var existingStudent = await _db.Students
                 .FirstOrDefaultAsync(s => s.MacAddress == macAddress);
 
+            Student student;
             if (existingStudent == null)
             {
-                // Nieuwe student toevoegen
-                var newStudent = new Student
+                student = new Student
                 {
                     Name = request.StudentName.Trim(),
                     TestName = activeSessionDto.Name,
                     MacAddress = macAddress
                 };
-                _db.Students.Add(newStudent);
+                _db.Students.Add(student);
                 _logger.LogInformation("Nieuwe student geregistreerd: {StudentName} voor toets {TestName}",
-                    newStudent.Name, activeSessionDto.Name);
+                    student.Name, activeSessionDto.Name);
             }
             else
             {
-                // Bestaande student updaten
                 existingStudent.Name = request.StudentName.Trim();
                 existingStudent.TestName = activeSessionDto.Name;
+                student = existingStudent;
                 _logger.LogInformation("Bestaande student bijgewerkt: {StudentName} voor toets {TestName}",
-                    existingStudent.Name, activeSessionDto.Name);
+                    student.Name, activeSessionDto.Name);
             }
 
             await _db.SaveChangesAsync();
+
+            // Stuur een SignalR-update als de student al op WiFi zit.
+            // Zonder dit blijft het dashboard de oude naam tonen en ziet de student een rood scherm,
+            // omdat HandleConnectAsync al eerder vuurde met verouderde gegevens.
+            bool hasOpenConnection = await _db.Connections
+                .AnyAsync(c => c.StudentId == student.Id && c.DisconnectedAt == null);
+            if (hasOpenConnection)
+            {
+                await _hubContext.Clients.All.SendAsync("status", new
+                {
+                    mac = macAddress,
+                    status = "connected",
+                    name = student.Name,
+                    testName = activeSessionDto.Name
+                });
+            }
 
             return new StudentRegistrationResultDto
             {
