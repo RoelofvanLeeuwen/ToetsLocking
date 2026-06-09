@@ -168,9 +168,22 @@ else
                             <tbody>
                                 @foreach (StudentActivityDto a in studentActivity)
                                 {
-                                    <tr class="@(a.EventType == EventType.Disconnected ? "table-warning" : "table-success")">
+                                    <tr class="@(a.EventType == EventType.Disconnected ? "table-warning" : a.EventType == EventType.TestCompleted ? "table-info" : "table-success")">
                                         <td>@a.Timestamp.ToLocalTime().ToString("HH:mm:ss")</td>
-                                        <td>@(a.EventType == EventType.Disconnected ? "🔴 Verbinding verbroken" : "🟢 Verbonden")</td>
+                                        <td>
+                                            @if (a.EventType == EventType.Disconnected)
+                                            {
+                                                <span>🔴 Verbinding verbroken</span>
+                                            }
+                                            else if (a.EventType == EventType.TestCompleted)
+                                            {
+                                                <span>🏁 Ik ben klaar</span>
+                                            }
+                                            else
+                                            {
+                                                <span>🟢 Verbonden</span>
+                                            }
+                                        </td>
                                     </tr>
                                 }
                             </tbody>
@@ -332,6 +345,9 @@ else
                     }
                     else
                     {
+                        if (payload.Status == "connected")
+                            existingStudent.IsTestComplete = false;
+
                         bool wasOnline = existingStudent.IsOnline;
                         existingStudent.IsOnline = payload.Status == "connected";
 

@@ -7,6 +7,7 @@
 @inject ILogger<Register> Logger
 @inject StudentWifiMonitoring.Web.Services.IMacResolver MacResolver
 @inject StudentWifiMonitoring.Web.Services.Interfaces.IMyScreenService MyScreenService
+@inject NavigationManager Nav
 
 <PageTitle>Registreren</PageTitle>
 
@@ -165,8 +166,8 @@
 
             if (result.Success)
             {
-                _successMessage = result.SuccessMessage ?? "Registratie succesvol.";
-                _studentName = string.Empty; // Reset form
+                Nav.NavigateTo("/myscreen");
+                return;
             }
             else
             {

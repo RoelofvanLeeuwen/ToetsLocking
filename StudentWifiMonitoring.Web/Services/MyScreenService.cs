@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using StudentWifiMonitoring.Web.Data;
+using StudentWifiMonitoring.Web.Domain;
 using StudentWifiMonitoring.Web.DTOs.MyScreen;
 using StudentWifiMonitoring.Web.Hubs;
 using StudentWifiMonitoring.Web.Services.Interfaces;
@@ -77,6 +78,19 @@ public class MyScreenService : IMyScreenService
             .ToListAsync();
         foreach (var conn in openConnections)
             conn.DisconnectedAt = now;
+
+        var activeSession = await _db.TestSessions
+            .FirstOrDefaultAsync(ts => ts.StartTime <= now && ts.EndTime >= now);
+        if (activeSession != null)
+        {
+            _db.Events.Add(new EventLog
+            {
+                StudentId = student.Id,
+                TestSessionId = activeSession.Id,
+                EventType = EventType.TestCompleted,
+                Timestamp = now
+            });
+        }
 
         await _db.SaveChangesAsync();
 

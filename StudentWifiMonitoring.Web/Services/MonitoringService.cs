@@ -194,13 +194,15 @@ public class MonitoringService : BackgroundService
             return;
         }
 
+        var now = DateTime.UtcNow;
+
         if (student.IsTestComplete)
         {
-            _logger.LogDebug("Student {Name} ({MacAddress}) heeft de toets al afgerond, verbinding wordt genegeerd", student.Name, mac);
-            return;
+            // Student heeft eerder 'Ik ben klaar' geklikt maar verbindt opnieuw:
+            // reset de vlag zodat monitoring hervat en het dashboard de ✅ verwijdert.
+            student.IsTestComplete = false;
+            _logger.LogInformation("Student {Name} ({MacAddress}) verbindt opnieuw na 'Ik ben klaar', monitoring hervat", student.Name, mac);
         }
-
-        var now = DateTime.UtcNow;
 
         // Sluit eventuele stale open verbindingen van vorige sessies voordat we een nieuwe aanmaken.
         // HandleConnectAsync wordt aangeroepen als een MAC opnieuw verschijnt na een periode offline —
