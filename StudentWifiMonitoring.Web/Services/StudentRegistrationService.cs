@@ -120,7 +120,8 @@ public class StudentRegistrationService : IStudentRegistrationService
                 {
                     Name = request.StudentName.Trim(),
                     TestName = activeSessionDto.Name,
-                    MacAddress = macAddress
+                    MacAddress = macAddress,
+                    IsTestComplete = false
                 };
                 _db.Students.Add(student);
                 _logger.LogInformation("Nieuwe student geregistreerd: {StudentName} voor toets {TestName}",
@@ -130,6 +131,7 @@ public class StudentRegistrationService : IStudentRegistrationService
             {
                 existingStudent.Name = request.StudentName.Trim();
                 existingStudent.TestName = activeSessionDto.Name;
+                existingStudent.IsTestComplete = false;
                 student = existingStudent;
                 _logger.LogInformation("Bestaande student bijgewerkt: {StudentName} voor toets {TestName}",
                     student.Name, activeSessionDto.Name);

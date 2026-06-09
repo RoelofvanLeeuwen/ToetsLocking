@@ -1,6 +1,8 @@
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using StudentWifiMonitoring.Web.Data;
 using StudentWifiMonitoring.Web.DTOs.MyScreen;
+using StudentWifiMonitoring.Web.Hubs;
 using StudentWifiMonitoring.Web.Services.Interfaces;
 
 namespace StudentWifiMonitoring.Web.Services;
@@ -12,10 +14,12 @@ namespace StudentWifiMonitoring.Web.Services;
 public class MyScreenService : IMyScreenService
 {
     private readonly AppDbContext _db;
+    private readonly IHubContext<StatusHub> _hubContext;
 
-    public MyScreenService(AppDbContext db)
+    public MyScreenService(AppDbContext db, IHubContext<StatusHub> hubContext)
     {
         _db = db;
+        _hubContext = hubContext;
     }
 
     /// <summary>
@@ -54,8 +58,34 @@ public class MyScreenService : IMyScreenService
         {
             IsRegistered = true,
             IsConnected = isConnected,
+            IsTestComplete = student.IsTestComplete,
             Name = student.Name,
             TestName = student.TestName
         };
+    }
+
+    public async Task MarkTestCompleteAsync(string macAddress)
+    {
+        var student = await _db.Students.FirstOrDefaultAsync(s => s.MacAddress == macAddress);
+        if (student == null) return;
+
+        student.IsTestComplete = true;
+
+        var now = DateTime.UtcNow;
+        var openConnections = await _db.Connections
+            .Where(c => c.StudentId == student.Id && c.DisconnectedAt == null)
+            .ToListAsync();
+        foreach (var conn in openConnections)
+            conn.DisconnectedAt = now;
+
+        await _db.SaveChangesAsync();
+
+        await _hubContext.Clients.All.SendAsync("status", new
+        {
+            mac = macAddress,
+            status = "testcomplete",
+            name = student.Name,
+            testName = student.TestName
+        });
     }
 }

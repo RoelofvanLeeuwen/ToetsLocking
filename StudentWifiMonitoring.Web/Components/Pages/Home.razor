@@ -101,7 +101,11 @@ else
                                 {
                                     <tr class="@(s.IsOnline ? "table-success" : "")" style="cursor:pointer" @onclick="() => OpenStudentDetail(s)" title="Klik voor activiteitenlog">
                                         <td>
-                                            @if (s.IsOnline)
+                                            @if (s.IsTestComplete)
+                                            {
+                                                <span class="badge bg-success">✅ Klaar</span>
+                                            }
+                                            else if (s.IsOnline)
                                             {
                                                 <span class="badge bg-success">🟢 Verbonden</span>
                                             }
@@ -306,20 +310,28 @@ else
 
                 if (existingStudent != null)
                 {
-                    bool wasOnline = existingStudent.IsOnline;
-                    existingStudent.IsOnline = payload.Status == "connected";
+                    if (payload.Status == "testcomplete")
+                    {
+                        existingStudent.IsOnline = false;
+                        existingStudent.IsTestComplete = true;
+                    }
+                    else
+                    {
+                        bool wasOnline = existingStudent.IsOnline;
+                        existingStudent.IsOnline = payload.Status == "connected";
 
-                    if (wasOnline && !existingStudent.IsOnline)
-                        existingStudent.DisconnectionCount++;
+                        if (wasOnline && !existingStudent.IsOnline)
+                            existingStudent.DisconnectionCount++;
 
-                    if (!wasOnline && existingStudent.IsOnline)
-                        existingStudent.LastConnectedAt = DateTime.UtcNow;
+                        if (!wasOnline && existingStudent.IsOnline)
+                            existingStudent.LastConnectedAt = DateTime.UtcNow;
 
-                    if (!string.IsNullOrEmpty(payload.Name) && existingStudent.Name != payload.Name)
-                        existingStudent.Name = payload.Name;
+                        if (!string.IsNullOrEmpty(payload.Name) && existingStudent.Name != payload.Name)
+                            existingStudent.Name = payload.Name;
 
-                    if (!string.IsNullOrEmpty(payload.TestName) && existingStudent.TestName != payload.TestName)
-                        existingStudent.TestName = payload.TestName;
+                        if (!string.IsNullOrEmpty(payload.TestName) && existingStudent.TestName != payload.TestName)
+                            existingStudent.TestName = payload.TestName;
+                    }
                 }
                 else if (!string.IsNullOrEmpty(payload.Name) && selectedTestId.HasValue)
                 {

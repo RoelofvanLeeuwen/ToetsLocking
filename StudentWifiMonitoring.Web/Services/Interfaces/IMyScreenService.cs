@@ -18,4 +18,9 @@ public interface IMyScreenService
     /// als er geen student gevonden is met het opgegeven MAC-adres.
     /// </returns>
     Task<StudentConnectionStatusDto> GetStudentConnectionStatusAsync(string macAddress);
+
+    /// <summary>
+    /// Markeert de student als "klaar" met de toets: sluit open verbindingen en stuurt een SignalR-event.
+    /// </summary>
+    Task MarkTestCompleteAsync(string macAddress);
 }

@@ -79,6 +79,27 @@
         font-size: 14px;
         background-color: rgba(0, 0, 0, 0.3);
     }
+
+    .status-complete {
+        background-color: #17a2b8;
+        color: white;
+    }
+
+    .btn-klaar {
+        font-size: 28px;
+        padding: 16px 48px;
+        margin-top: 40px;
+        border-radius: 12px;
+        background-color: white;
+        color: #28a745;
+        border: none;
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+    .btn-klaar:hover {
+        background-color: #f0f0f0;
+    }
 </style>
 
 @if (_isLoading)
@@ -101,6 +122,19 @@ else if (!string.IsNullOrEmpty(_errorMessage))
         }
     </div>
 }
+else if (_isTestComplete)
+{
+    <div class="fullscreen-status status-complete">
+        <div class="status-icon">🏁</div>
+        <div class="status-title">Klaar!</div>
+        <div class="status-message">Je kunt weer met het normale netwerk verbinden</div>
+        <div class="status-details">
+            <div>Naam: @_studentName</div>
+            <div>Toets: @_testName</div>
+        </div>
+        <div class="status-mac">@_macAddress</div>
+    </div>
+}
 else if (_isConnected)
 {
     <div class="fullscreen-status status-connected">
@@ -111,6 +145,7 @@ else if (_isConnected)
             <div>Naam: @_studentName</div>
             <div>Toets: @_testName</div>
         </div>
+        <button class="btn-klaar" @onclick="KlaarClickedAsync">Ik ben klaar</button>
         <div class="status-mac">@_macAddress</div>
         @if (_isSignalRConnected)
         {
@@ -155,6 +190,7 @@ else
     private string? _macAddress;
     private StudentConnectionStatusDto? _status;
     private bool _isConnected;
+    private bool _isTestComplete;
     private bool _isLoading = true;
     private string? _errorMessage;
     private string? _studentName;
@@ -232,6 +268,7 @@ else
 
         _status = await MyScreenService.GetStudentConnectionStatusAsync(_macAddress);
         _isConnected = _status.IsConnected;
+        _isTestComplete = _status.IsTestComplete;
         _studentName = _status.Name;
         _testName = _status.TestName;
     }
@@ -336,6 +373,11 @@ else
             {
                 _isConnected = false;
             }
+            else if (payload.Status == "testcomplete")
+            {
+                _isConnected = false;
+                _isTestComplete = true;
+            }
 
             // Trigger UI update
             await InvokeAsync(StateHasChanged);
@@ -344,6 +386,15 @@ else
         {
             Console.WriteLine($"Fout bij verwerken status update: {ex.Message}");
         }
+    }
+
+    private async Task KlaarClickedAsync()
+    {
+        if (string.IsNullOrEmpty(_macAddress)) return;
+        await MyScreenService.MarkTestCompleteAsync(_macAddress);
+        _isConnected = false;
+        _isTestComplete = true;
+        await InvokeAsync(StateHasChanged);
     }
 
     /// <summary>

@@ -142,6 +142,8 @@ public class MonitoringService : BackgroundService
 
         foreach (var student in onlineStudents)
         {
+            if (student.IsTestComplete) continue;
+
             // Sla over als de student al een open verbinding heeft
             bool hasOpenConnection = await context.Connections
                 .AnyAsync(c => c.StudentId == student.Id && c.DisconnectedAt == null, cancellationToken);
@@ -189,6 +191,12 @@ public class MonitoringService : BackgroundService
         if (student == null)
         {
             _logger.LogWarning("Onbekend MAC-adres verbonden: {MacAddress}", mac);
+            return;
+        }
+
+        if (student.IsTestComplete)
+        {
+            _logger.LogDebug("Student {Name} ({MacAddress}) heeft de toets al afgerond, verbinding wordt genegeerd", student.Name, mac);
             return;
         }
 
