@@ -146,7 +146,8 @@ public class DashboardService : IDashboardService
             .Select(e => new StudentActivityDto
             {
                 Timestamp = e.Timestamp,
-                EventType = e.EventType
+                EventType = e.EventType,
+                StudentName = e.StudentName
             })
             .ToList();
     }

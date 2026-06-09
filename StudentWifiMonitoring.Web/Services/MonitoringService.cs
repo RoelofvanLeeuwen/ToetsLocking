@@ -165,7 +165,8 @@ public class MonitoringService : BackgroundService
                 StudentId = student.Id,
                 TestSessionId = activeSession.Id,
                 EventType = EventType.Connected,
-                Timestamp = now
+                Timestamp = now,
+                StudentName = student.Name
             });
 
             await context.SaveChangesAsync(cancellationToken);
@@ -227,7 +228,8 @@ public class MonitoringService : BackgroundService
             StudentId = student.Id,
             TestSessionId = activeSession.Id,
             EventType = EventType.Connected,
-            Timestamp = now
+            Timestamp = now,
+            StudentName = student.Name
         };
         context.Events.Add(eventLog);
 
@@ -276,7 +278,8 @@ public class MonitoringService : BackgroundService
             StudentId = student.Id,
             TestSessionId = activeSession.Id,
             EventType = EventType.Disconnected,
-            Timestamp = now
+            Timestamp = now,
+            StudentName = student.Name
         };
         context.Events.Add(eventLog);
 

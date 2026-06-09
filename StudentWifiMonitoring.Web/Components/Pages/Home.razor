@@ -162,6 +162,7 @@ else
                             <thead class="table-light">
                                 <tr>
                                     <th>Tijdstip</th>
+                                    <th>Naam</th>
                                     <th>Gebeurtenis</th>
                                 </tr>
                             </thead>
@@ -170,6 +171,7 @@ else
                                 {
                                     <tr class="@(a.EventType == EventType.Disconnected ? "table-warning" : a.EventType == EventType.TestCompleted ? "table-info" : "table-success")">
                                         <td>@a.Timestamp.ToLocalTime().ToString("HH:mm:ss")</td>
+                                        <td><strong>@a.StudentName</strong></td>
                                         <td>
                                             @if (a.EventType == EventType.Disconnected)
                                             {

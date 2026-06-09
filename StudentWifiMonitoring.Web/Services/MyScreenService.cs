@@ -88,7 +88,8 @@ public class MyScreenService : IMyScreenService
                 StudentId = student.Id,
                 TestSessionId = activeSession.Id,
                 EventType = EventType.TestCompleted,
-                Timestamp = now
+                Timestamp = now,
+                StudentName = student.Name
             });
         }
 
