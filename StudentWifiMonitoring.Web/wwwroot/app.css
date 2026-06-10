@@ -125,6 +125,7 @@ html, body { height: 100%; margin: 0; padding: 0; }
 .tl-stu.blocked .tl-bigbtn   { color: var(--tl-red-2); }
 .tl-stu.joining .tl-bigbtn   { color: var(--tl-brand-700); }
 .tl-bigbtn.ghost { background: rgba(255,255,255,.16); color: #fff; border: 1px solid rgba(255,255,255,.4); box-shadow: none; }
+.tl-bigbtn--secondary { background: rgba(255,255,255,.18); color: #fff; border: 1.5px solid rgba(255,255,255,.45); box-shadow: none; font-size: 16px; padding: 13px 24px; margin-top: 12px; }
 .tl-bigbtn:disabled { opacity: .6; cursor: not-allowed; }
 
 .tl-mac { margin-top: 18px; font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; font-size: 13px; letter-spacing: 0.06em; opacity: .72; display: inline-flex; align-items: center; gap: 8px; }
