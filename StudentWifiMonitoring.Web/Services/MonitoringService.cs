@@ -144,6 +144,9 @@ public class MonitoringService : BackgroundService
         {
             if (student.IsTestComplete) continue;
 
+            // Sla over als de student niet voor de huidige toets is geregistreerd
+            if (student.TestName != activeSession.Name) continue;
+
             // Sla over als de student al een open verbinding heeft
             bool hasOpenConnection = await context.Connections
                 .AnyAsync(c => c.StudentId == student.Id && c.DisconnectedAt == null, cancellationToken);
@@ -192,6 +195,14 @@ public class MonitoringService : BackgroundService
         if (student == null)
         {
             _logger.LogWarning("Onbekend MAC-adres verbonden: {MacAddress}", mac);
+            return;
+        }
+
+        // Sla over als de student niet voor de huidige toets is geregistreerd
+        if (student.TestName != activeSession.Name)
+        {
+            _logger.LogInformation("MAC {MacAddress} bekend als '{Name}' maar niet geregistreerd voor huidige toets '{TestName}', overgeslagen",
+                mac, student.Name, activeSession.Name);
             return;
         }
 
