@@ -4,53 +4,59 @@
 @inject ITeacherAuthService TeacherAuth
 @inject NavigationManager Nav
 
-<PageTitle>Docent inloggen</PageTitle>
+<PageTitle>Docent inloggen — Toetslocker</PageTitle>
 
-<div class="container mt-5">
-    <div class="row justify-content-center">
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-header bg-dark text-white">
-                    <h4 class="mb-0">🔒 Docent inloggen</h4>
+<div class="tl-auth-bg tl-root">
+    <div class="tl-auth-card">
+        <div class="tl-auth-head">
+            <div class="ic"><TLLogoMark Size="30" /></div>
+            <div class="t">Docent inloggen</div>
+        </div>
+        <div class="tl-auth-body">
+            @if (_isLoggedIn)
+            {
+                <div class="tl-auth-ok">
+                    <TLIcon Name="shield" Size="18" />
+                    Ingelogd als docent
                 </div>
-                <div class="card-body">
-                    @if (_isLoggedIn)
-                    {
-                        <div class="alert alert-success">
-                            <strong>Ingelogd als docent.</strong>
-                        </div>
-                        <a href="/" class="btn btn-primary w-100">Naar dashboard</a>
+                <a href="/" class="tl-btn tl-btn-brand">
+                    <TLIcon Name="grid" Size="18" /> Naar dashboard
+                </a>
 
-                        @* Logout verloopt via een echte HTTP POST zodat het cookie verwijderd kan worden *@
-                        <form method="post" action="/api/teacher/logout" class="mt-2">
-                            <button type="submit" class="btn btn-outline-secondary w-100">Uitloggen</button>
-                        </form>
-                    }
-                    else
-                    {
-                        <p class="text-muted small">Voer de docentpincode in om beheerfunctionaliteit te openen.</p>
+                @* Logout verloopt via een echte HTTP POST zodat het cookie verwijderd kan worden *@
+                <form method="post" action="/api/teacher/logout">
+                    <button type="submit" class="tl-btn tl-btn-ghost">
+                        <TLIcon Name="logout" Size="18" /> Uitloggen
+                    </button>
+                </form>
+            }
+            else
+            {
+                <p class="tl-auth-hint">Voer de docentpincode in om beheerfunctionaliteit te openen.</p>
 
-                        @if (_loginFailed)
-                        {
-                            <div class="alert alert-danger">Pincode onjuist. Probeer opnieuw.</div>
-                        }
+                @if (_loginFailed)
+                {
+                    <div class="tl-auth-err">
+                        <TLIcon Name="alert" Size="18" /> Pincode onjuist. Probeer opnieuw.
+                    </div>
+                }
 
-                        @* Login verloopt via een echte HTTP POST zodat het cookie vóór de response gezet kan worden.
-                           Blazor session writes zijn niet mogelijk nadat de response gestart is. *@
-                        <form method="post" action="/api/teacher/login">
-                            <div class="mb-3">
-                                <label class="form-label">Pincode</label>
-                                <input type="password"
-                                       name="pin"
-                                       class="form-control"
-                                       placeholder="Voer pincode in"
-                                       autofocus />
-                            </div>
-                            <button type="submit" class="btn btn-dark w-100">Inloggen</button>
-                        </form>
-                    }
-                </div>
-            </div>
+                @* Login verloopt via een echte HTTP POST zodat het cookie vóór de response gezet kan worden.
+                   Blazor session writes zijn niet mogelijk nadat de response gestart is. *@
+                <form method="post" action="/api/teacher/login">
+                    <div class="tl-fld" style="margin-bottom:18px">
+                        <label>Pincode</label>
+                        <input type="password"
+                               name="pin"
+                               class="tl-in"
+                               placeholder="Voer pincode in"
+                               autofocus />
+                    </div>
+                    <button type="submit" class="tl-btn tl-btn-brand">
+                        <TLIcon Name="lock" Size="18" /> Inloggen
+                    </button>
+                </form>
+            }
         </div>
     </div>
 </div>

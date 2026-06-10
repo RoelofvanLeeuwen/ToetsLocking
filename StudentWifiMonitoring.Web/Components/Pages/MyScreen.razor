@@ -1,4 +1,5 @@
-﻿@page "/myscreen"
+@page "/myscreen"
+@layout StudentLayout
 @using Microsoft.AspNetCore.SignalR.Client
 @using StudentWifiMonitoring.Web.DTOs.MyScreen
 @using StudentWifiMonitoring.Web.Services
@@ -12,183 +13,128 @@
 @inject StudentWifiMonitoring.Web.Services.StudentNavStateService NavState
 @implements IAsyncDisposable
 
-<PageTitle>Mijn Verbindingsstatus</PageTitle>
-
-<style>
-    body, html {
-        margin: 0;
-        padding: 0;
-    }
-
-    .fullscreen-status {
-        width: 100%;
-        min-height: 100dvh;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        text-align: center;
-        padding: 24px 16px;
-        box-sizing: border-box;
-        transition: background-color 0.5s ease;
-    }
-
-    .status-connected {
-        background-color: #28a745;
-        color: white;
-    }
-
-    .status-disconnected {
-        background-color: #dc3545;
-        color: white;
-    }
-
-    .status-complete {
-        background-color: #17a2b8;
-        color: white;
-    }
-
-    .status-icon {
-        font-size: clamp(60px, 15vw, 120px);
-        margin-bottom: clamp(15px, 3vw, 30px);
-        line-height: 1;
-    }
-
-    .status-title {
-        font-size: clamp(28px, 8vw, 48px);
-        font-weight: bold;
-        margin-bottom: clamp(10px, 2vw, 20px);
-    }
-
-    .status-message {
-        font-size: clamp(16px, 5vw, 32px);
-        margin-bottom: clamp(8px, 1.5vw, 15px);
-        padding: 0 8px;
-    }
-
-    .status-details {
-        font-size: clamp(14px, 4vw, 24px);
-        opacity: 0.9;
-        margin-top: clamp(10px, 2vw, 20px);
-        line-height: 1.6;
-    }
-
-    .status-mac {
-        font-family: monospace;
-        font-size: clamp(11px, 2.5vw, 20px);
-        opacity: 0.7;
-        margin-top: clamp(20px, 4vw, 40px);
-        word-break: break-all;
-        padding: 0 8px;
-    }
-
-    .signalr-indicator {
-        position: fixed;
-        top: 10px;
-        right: 10px;
-        padding: 8px 12px;
-        border-radius: 5px;
-        font-size: 14px;
-        background-color: rgba(0, 0, 0, 0.3);
-    }
-
-    .btn-klaar {
-        font-size: clamp(18px, 5vw, 28px);
-        padding: clamp(10px, 2.5vw, 16px) clamp(24px, 8vw, 48px);
-        margin-top: clamp(20px, 5vw, 40px);
-        border-radius: 12px;
-        background-color: white;
-        color: #28a745;
-        border: none;
-        font-weight: bold;
-        cursor: pointer;
-        touch-action: manipulation;
-        -webkit-tap-highlight-color: transparent;
-    }
-
-    .btn-klaar:hover, .btn-klaar:active {
-        background-color: #f0f0f0;
-    }
-</style>
+<PageTitle>Mijn Scherm — Toetslocker</PageTitle>
 
 @if (_isLoading)
 {
-    <div class="fullscreen-status status-disconnected">
-        <div class="status-icon">⏳</div>
-        <div class="status-title">Laden...</div>
-        <div class="status-message">Verbindingsstatus wordt bepaald</div>
+    <div class="tl-stu joining tl-root">
+        <div class="tl-stu-bar">
+            <div class="tl-stu-brand"><TLLogoMark Size="28" /> Toetslocker</div>
+        </div>
+        <div class="tl-stu-body">
+            <div class="tl-badge"><TLLogoMark Size="58" /></div>
+            <h1 class="tl-stu-title">Laden…</h1>
+            <p class="tl-stu-sub">Verbindingsstatus wordt bepaald</p>
+        </div>
     </div>
 }
 else if (!string.IsNullOrEmpty(_errorMessage))
 {
-    <div class="fullscreen-status status-disconnected">
-        <div class="status-icon">⚠️</div>
-        <div class="status-title">Fout</div>
-        <div class="status-message">@_errorMessage</div>
-        @if (!string.IsNullOrEmpty(_macAddress))
-        {
-            <div class="status-mac">MAC: @_macAddress</div>
-        }
+    <div class="tl-stu blocked tl-root">
+        <div class="tl-stu-bar">
+            <div class="tl-stu-brand"><TLLogoMark Size="28" /> Toetslocker</div>
+        </div>
+        <div class="tl-stu-body">
+            <div class="tl-badge"><TLIcon Name="wifi-off" Size="54" Stroke="2.4" /></div>
+            <h1 class="tl-stu-title">Fout</h1>
+            <p class="tl-stu-sub">@_errorMessage</p>
+            @if (!string.IsNullOrEmpty(_macAddress))
+            {
+                <div class="tl-mac"><TLIcon Name="lock" Size="14" /> @_macAddress</div>
+            }
+        </div>
     </div>
 }
 else if (_isTestComplete)
 {
-    <div class="fullscreen-status status-complete">
-        <div class="status-icon">🏁</div>
-        <div class="status-title">Klaar!</div>
-        <div class="status-message">Je kunt weer met het normale netwerk verbinden</div>
-        <div class="status-details">
-            <div>Naam: @_studentName</div>
-            <div>Toets: @_testName</div>
+    <div class="tl-stu done tl-root">
+        <div class="tl-stu-bar">
+            <div class="tl-stu-brand"><TLLogoMark Size="28" /> Toetslocker</div>
+            <div class="tl-realtime"><i></i> Realtime</div>
         </div>
-        <div class="status-mac">@_macAddress</div>
+        <div class="tl-stu-body">
+            <div class="tl-badge"><TLIcon Name="flag" Size="54" Stroke="2.4" /></div>
+            <h1 class="tl-stu-title">Klaar!</h1>
+            <p class="tl-stu-sub">Je kunt nu de verbinding verbreken en weer met het normale netwerk verbinden.</p>
+            <div class="tl-infocard">
+                <div class="tl-inforow">
+                    <span>Naam</span>
+                    <b><span class="tl-ava">@GetInitials(_studentName)</span>@_studentName</b>
+                </div>
+                <div class="tl-inforow">
+                    <span>Toets</span>
+                    <b>@_testName</b>
+                </div>
+            </div>
+            <div class="tl-mac"><TLIcon Name="lock" Size="14" /> @_macAddress</div>
+        </div>
     </div>
 }
 else if (_isConnected)
 {
-    <div class="fullscreen-status status-connected">
-        <div class="status-icon">✅</div>
-        <div class="status-title">Verbonden</div>
-        <div class="status-message">Je bent succesvol verbonden!</div>
-        <div class="status-details">
-            <div>Naam: @_studentName</div>
-            <div>Toets: @_testName</div>
+    <div class="tl-stu connected tl-root">
+        <div class="tl-stu-bar">
+            <div class="tl-stu-brand"><TLLogoMark Size="28" /> Toetslocker</div>
+            <div class="tl-realtime"><i></i> Realtime</div>
         </div>
-        <button class="btn-klaar" @onclick="KlaarClickedAsync">Ik ben klaar</button>
-        <div class="status-mac">@_macAddress</div>
-        @if (_isSignalRConnected)
-        {
-            <div class="signalr-indicator">
-                <span>🟢 Realtime</span>
+        <div class="tl-stu-body">
+            <div class="tl-badge"><TLIcon Name="check" Size="54" Stroke="2.4" /></div>
+            <h1 class="tl-stu-title">Verbonden</h1>
+            <p class="tl-stu-sub">Je bent succesvol verbonden met de toets. Sluit dit scherm niet.</p>
+            <div class="tl-infocard">
+                <div class="tl-inforow">
+                    <span>Naam</span>
+                    <b><span class="tl-ava">@GetInitials(_studentName)</span>@_studentName</b>
+                </div>
+                <div class="tl-inforow">
+                    <span>Toets</span>
+                    <b>@_testName</b>
+                </div>
             </div>
-        }
+            <button class="tl-bigbtn" @onclick="KlaarClickedAsync">
+                <TLIcon Name="flag" Size="20" /> Ik ben klaar
+            </button>
+            <div class="tl-mac"><TLIcon Name="lock" Size="14" /> @_macAddress</div>
+        </div>
     </div>
 }
 else
 {
-    <div class="fullscreen-status status-disconnected">
-        <div class="status-icon">❌</div>
-        <div class="status-title">Niet Verbonden</div>
-        @if (_status?.IsRegistered == true)
-        {
-            <div class="status-message">Je bent geregistreerd maar niet verbonden</div>
-            <div class="status-details">
-                <div>Naam: @_studentName</div>
-                <div>Toets: @_testName</div>
-            </div>
-        }
-        else
-        {
-            <div class="status-message">Je bent nog niet geregistreerd</div>
-            <div class="status-details">Meld je eerst aan via de registratiepagina</div>
-        }
-        <div class="status-mac">@_macAddress</div>
-        @if (_isSignalRConnected)
-        {
-            <div class="signalr-indicator">
-                <span>🟢 Realtime</span>
-            </div>
-        }
+    <div class="tl-stu blocked tl-root">
+        <div class="tl-stu-bar">
+            <div class="tl-stu-brand"><TLLogoMark Size="28" /> Toetslocker</div>
+            @if (_isSignalRConnected)
+            {
+                <div class="tl-realtime"><i></i> Realtime</div>
+            }
+        </div>
+        <div class="tl-stu-body">
+            <div class="tl-warn"><TLIcon Name="alert" Size="16" /> Let op</div>
+            <div class="tl-badge"><TLIcon Name="wifi-off" Size="54" Stroke="2.4" /></div>
+            <h1 class="tl-stu-title">Geen verbinding</h1>
+            @if (_status?.IsRegistered == true)
+            {
+                <p class="tl-stu-sub">Je bent geregistreerd maar niet verbonden met het toetsnetwerk.</p>
+                <div class="tl-infocard">
+                    <div class="tl-inforow">
+                        <span>Naam</span>
+                        <b><span class="tl-ava">@GetInitials(_studentName)</span>@_studentName</b>
+                    </div>
+                    <div class="tl-inforow">
+                        <span>Toets</span>
+                        <b>@_testName</b>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <p class="tl-stu-sub">Je bent niet verbonden met de toets. Verbind opnieuw om verder te gaan.</p>
+                <a href="/register" class="tl-bigbtn">
+                    <TLIcon Name="wifi" Size="20" /> Aanmelden
+                </a>
+            }
+            <div class="tl-mac"><TLIcon Name="lock" Size="14" /> @_macAddress</div>
+        </div>
     </div>
 }
 
@@ -351,7 +297,7 @@ else
         try
         {
             // Controleer of dit event voor deze student is
-            if (string.IsNullOrEmpty(payload.Mac) || 
+            if (string.IsNullOrEmpty(payload.Mac) ||
                 payload.Mac.ToLowerInvariant() != _macAddress?.ToLowerInvariant())
             {
                 return;
@@ -361,7 +307,7 @@ else
             if (payload.Status == "connected")
             {
                 _isConnected = true;
-                
+
                 // Update student info als deze beschikbaar is in payload
                 if (!string.IsNullOrEmpty(payload.Name))
                 {
@@ -410,6 +356,13 @@ else
         _isTestComplete = true;
         NavState.SetCanRegister(true);
         await InvokeAsync(StateHasChanged);
+    }
+
+    private static string GetInitials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        var words = name.Split(' ', System.StringSplitOptions.RemoveEmptyEntries);
+        return string.Concat(words.Take(2).Select(w => char.ToUpper(w[0])));
     }
 
     /// <summary>

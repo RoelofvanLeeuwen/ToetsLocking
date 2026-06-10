@@ -1,4 +1,5 @@
-﻿@page "/register"
+@page "/register"
+@layout StudentLayout
 @rendermode InteractiveServer
 @using StudentWifiMonitoring.Web.DTOs.Students
 @using StudentWifiMonitoring.Web.Services.Interfaces
@@ -9,75 +10,91 @@
 @inject StudentWifiMonitoring.Web.Services.Interfaces.IMyScreenService MyScreenService
 @inject NavigationManager Nav
 
-<PageTitle>Registreren</PageTitle>
+<PageTitle>Registreren — Toetslocker</PageTitle>
 
-<div class="container mt-4">
-    <h2>Student Registratie</h2>
-
-    @if (_isStudentActiveInTest)
-    {
-        <div class="alert alert-warning mt-3">
-            <strong>Je bent al actief in een toets</strong>
-            <p class="mb-0">Je wordt al gemonitord. Ga naar <a href="/myscreen">Mijn Scherm</a> en klik op "Ik ben klaar" als je klaar bent met de toets.</p>
+@if (_isStudentActiveInTest)
+{
+    <div class="tl-stu connected tl-root">
+        <div class="tl-stu-bar">
+            <div class="tl-stu-brand">
+                <TLLogoMark Size="28" /> Toetslocker
+            </div>
+            <div class="tl-realtime"><i></i> Realtime</div>
         </div>
-    }
-    else if (_activeSession == null)
-    {
-        <div class="alert alert-warning mt-3">
-            <strong>Geen actieve toets</strong>
-            <p class="mb-0">Er is momenteel geen toets actief. Registratie is alleen mogelijk tijdens een actieve toets.</p>
+        <div class="tl-stu-body">
+            <div class="tl-badge"><TLIcon Name="wifi" Size="54" Stroke="2.4" /></div>
+            <h1 class="tl-stu-title">Al actief</h1>
+            <p class="tl-stu-sub">Je bent al actief in een toets. Ga naar Mijn Scherm om je status te bekijken.</p>
+            <a href="/myscreen" class="tl-bigbtn">
+                <TLIcon Name="arrow" Size="20" /> Naar Mijn Scherm
+            </a>
         </div>
-    }
-    else
-    {
-        <div class="card mt-3">
-            <div class="card-body">
-                <h5 class="card-title">Toets: @_activeSession.Name</h5>
-                <p class="text-muted">Looptijd: @_activeSession.StartTime.ToLocalTime().ToString("dd-MM-yyyy HH:mm") - @_activeSession.EndTime.ToLocalTime().ToString("dd-MM-yyyy HH:mm")</p>
+    </div>
+}
+else if (_activeSession == null)
+{
+    <div class="tl-stu blocked tl-root">
+        <div class="tl-stu-bar">
+            <div class="tl-stu-brand">
+                <TLLogoMark Size="28" /> Toetslocker
+            </div>
+        </div>
+        <div class="tl-stu-body">
+            <div class="tl-badge"><TLIcon Name="lock" Size="54" Stroke="2.4" /></div>
+            <h1 class="tl-stu-title">Geen toets</h1>
+            <p class="tl-stu-sub">Er is momenteel geen actieve toets. Registratie is alleen mogelijk tijdens een actieve toets.</p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="tl-stu joining tl-root">
+        <div class="tl-stu-bar">
+            <div class="tl-stu-brand">
+                <TLLogoMark Size="28" /> Toetslocker
+            </div>
+        </div>
+        <div class="tl-stu-body">
+            <div class="tl-badge"><TLLogoMark Size="58" /></div>
+            <h1 class="tl-stu-title">Welkom</h1>
+            <p class="tl-stu-sub">Vul je naam in om aan te melden voor <strong>@_activeSession.Name</strong>.</p>
 
-                <div class="mb-3">
-                    <label for="studentName" class="form-label">Naam:</label>
-                    <input type="text" 
-                           class="form-control" 
-                           id="studentName" 
-                           @bind="_studentName" 
-                           placeholder="Voer je naam in"
+            <div class="tl-join">
+                @if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <div class="tl-warn">
+                        <TLIcon Name="alert" Size="16" /> @_errorMessage
+                    </div>
+                }
+
+                <div class="tl-field">
+                    <label for="studentName">Je naam</label>
+                    <input type="text"
+                           class="tl-input"
+                           id="studentName"
+                           @bind="_studentName"
+                           placeholder="Voor- en achternaam"
                            disabled="@_isProcessing" />
                 </div>
 
-                <button class="btn btn-primary" 
-                        @onclick="RegisterAsync" 
+                <button class="tl-bigbtn"
+                        @onclick="RegisterAsync"
                         disabled="@(_isProcessing || string.IsNullOrWhiteSpace(_studentName))">
                     @if (_isProcessing)
                     {
-                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                        <span>Bezig met registreren...</span>
+                        <TLIcon Name="refresh" Size="20" />
+                        <span>Bezig...</span>
                     }
                     else
                     {
-                        <span>Registreren</span>
+                        <TLIcon Name="wifi" Size="20" />
+                        <span>Verbinden met toets</span>
                     }
                 </button>
-
-                @if (!string.IsNullOrEmpty(_errorMessage))
-                {
-                    <div class="alert alert-danger mt-3">
-                        <strong>Fout</strong>
-                        <p class="mb-0">@_errorMessage</p>
-                    </div>
-                }
-
-                @if (!string.IsNullOrEmpty(_successMessage))
-                {
-                    <div class="alert alert-success mt-3">
-                        <strong>Gelukt!</strong>
-                        <p class="mb-0">@_successMessage</p>
-                    </div>
-                }
             </div>
         </div>
-    }
-</div>
+    </div>
+}
 
 @code {
     private ActiveTestSessionDto? _activeSession;
