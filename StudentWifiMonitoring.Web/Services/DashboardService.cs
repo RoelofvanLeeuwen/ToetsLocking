@@ -59,13 +59,18 @@ public class DashboardService : IDashboardService
                 return new List<StudentStatusDto>();
             }
 
-            // Alleen verbindingen die open zijn én gestart zijn vanaf de starttijd van deze sessie
-            // tellen als "online". Stale open verbindingen van verlopen toetsen (ConnectedAt vóór
-            // test.StartTime) worden zo uitgesloten — zelfde principe als de groen-scherm fix.
+            // Bepaal welke studenten daadwerkelijk deelnamen via de EventLog.
+            // Dit is betrouwbaarder dan Student.TestName, dat overschreven wordt bij latere registraties.
+            var participatingStudentIds = _db.Events
+                .Where(e => e.TestSessionId == testSessionId.Value)
+                .Select(e => e.StudentId)
+                .Distinct()
+                .ToHashSet();
+
             onlineMacs = _db.Connections
                 .Where(c => c.DisconnectedAt == null
-                            && c.Student!.TestName == test.Name
-                            && c.ConnectedAt >= test.StartTime)
+                            && c.ConnectedAt >= test.StartTime
+                            && participatingStudentIds.Contains(c.StudentId))
                 .Select(c => c.Student!.MacAddress)
                 .ToHashSet();
 
@@ -75,7 +80,6 @@ public class DashboardService : IDashboardService
                 .Select(g => new { StudentId = g.Key, Count = g.Count() })
                 .ToDictionary(x => x.StudentId, x => x.Count);
 
-            // Gebruik EventLog (gefilterd op sessie) voor de meest recente "Verbonden" gebeurtenis
             lastConnectionEvents = _db.Events
                 .Where(e => e.EventType == EventType.Connected && e.TestSessionId == testSessionId.Value)
                 .GroupBy(e => e.StudentId)
@@ -83,7 +87,7 @@ public class DashboardService : IDashboardService
                 .ToDictionary(x => x.StudentId, x => x.LastConnectedAt);
 
             return _db.Students
-                .Where(s => s.TestName == test.Name)
+                .Where(s => participatingStudentIds.Contains(s.Id))
                 .Select(s => new StudentStatusDto
                 {
                     MacAddress = s.MacAddress,
