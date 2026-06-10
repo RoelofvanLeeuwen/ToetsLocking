@@ -35,6 +35,7 @@ public class DevStationsService : IDevStationsService
 
         return new ActiveTestSessionDto
         {
+            Id = session.Id,
             Name = session.Name,
             StartTime = session.StartTime,
             EndTime = session.EndTime

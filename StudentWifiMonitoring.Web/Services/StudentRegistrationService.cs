@@ -50,6 +50,7 @@ public class StudentRegistrationService : IStudentRegistrationService
 
         return new ActiveTestSessionDto
         {
+            Id = activeSession.Id,
             Name = activeSession.Name,
             StartTime = activeSession.StartTime,
             EndTime = activeSession.EndTime
@@ -138,6 +139,20 @@ public class StudentRegistrationService : IStudentRegistrationService
             }
 
             await _db.SaveChangesAsync();
+
+            // Corrigeer de naam in het meest recente Connected-event van deze sessie.
+            // HandleConnectAsync kan een event hebben aangemaakt vóór registratie met een verouderde naam uit de database.
+            var lastConnectedEvent = await _db.Events
+                .Where(e => e.StudentId == student.Id &&
+                            e.TestSessionId == activeSessionDto.Id &&
+                            e.EventType == EventType.Connected)
+                .OrderByDescending(e => e.Timestamp)
+                .FirstOrDefaultAsync();
+            if (lastConnectedEvent != null && lastConnectedEvent.StudentName != student.Name)
+            {
+                lastConnectedEvent.StudentName = student.Name;
+                await _db.SaveChangesAsync();
+            }
 
             // Stuur een SignalR-update als de student al op WiFi zit.
             // Zonder dit blijft het dashboard de oude naam tonen en ziet de student een rood scherm,
