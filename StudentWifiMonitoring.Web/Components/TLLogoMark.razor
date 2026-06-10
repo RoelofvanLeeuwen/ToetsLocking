@@ -1,0 +1,12 @@
+@((MarkupString)_svg)
+
+@code {
+    [Parameter] public int Size { get; set; } = 32;
+
+    private string _svg => $"<svg width=\"{Size}\" height=\"{Size}\" viewBox=\"0 0 32 32\" fill=\"none\" class=\"tl-logo-mark\">" +
+        "<rect width=\"32\" height=\"32\" rx=\"9\" fill=\"var(--tl-brand)\"/>" +
+        "<rect x=\"8.5\" y=\"14\" width=\"15\" height=\"11\" rx=\"3.2\" fill=\"white\"/>" +
+        "<path d=\"M12 14v-3a4 4 0 0 1 8 0v3\" stroke=\"white\" stroke-width=\"2.4\" fill=\"none\"/>" +
+        "<path d=\"m13 19.4 2.2 2.2L19.5 17\" stroke=\"var(--tl-brand)\" stroke-width=\"2.3\" stroke-linecap=\"round\" stroke-linejoin=\"round\" fill=\"none\"/>" +
+        "</svg>";
+}

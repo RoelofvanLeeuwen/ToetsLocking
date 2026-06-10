@@ -1,4 +1,4 @@
-﻿@page "/export-by-test"
+@page "/export-by-test"
 @using StudentWifiMonitoring.Web.DTOs.Export
 @using StudentWifiMonitoring.Web.DTOs.Tests
 @using StudentWifiMonitoring.Web.Services.Interfaces
@@ -8,28 +8,44 @@
 @inject IJSRuntime JS
 @implements IDisposable
 
+<PageTitle>Export — Toetslocker</PageTitle>
+
 @if (!isTeacher)
 {
-    <div class="container mt-4">
-        <div class="alert alert-warning mt-5">
-            <h4 class="alert-heading">🔒 Geen toegang</h4>
-            <p class="mb-0">Deze pagina is alleen beschikbaar voor docenten.</p>
-        </div>
+    <div class="tl-empty">
+        <div class="ic"><TLIcon Name="lock" Size="32" /></div>
+        <h3>Geen toegang</h3>
+        <p>Deze pagina is alleen beschikbaar voor docenten.</p>
     </div>
 }
 else
 {
-<h3>Export per Toets</h3>
+    <div class="tl-export-card">
+        <div class="ic"><TLIcon Name="download" Size="32" /></div>
+        <h2>Export per toets</h2>
+        <p>Download een CSV-bestand met alle activiteiten van studenten voor de geselecteerde toets.</p>
 
-<select @bind-Value="selectedTestId" @bind-Value:event="onchange">
-    <option value="">-- Kies toets --</option>
-    @foreach (TestSessionDto t in tests)
-    {
-        <option value="@t.Id">@t.Name (@t.StartTime.ToLocalTime() - @t.EndTime.ToLocalTime())</option>
-    }
-</select>
-<button @onclick="Export">Download CSV</button>
-<p>@message</p>
+        <div class="tl-export-row">
+            <div class="tl-sel-wrap">
+                <label>Toets</label>
+                <select @bind-Value="selectedTestId" @bind-Value:event="onchange">
+                    <option value="">— Kies toets —</option>
+                    @foreach (TestSessionDto t in tests)
+                    {
+                        <option value="@t.Id">@t.Name (@t.StartTime.ToLocalTime().ToString("HH:mm") – @t.EndTime.ToLocalTime().ToString("HH:mm"))</option>
+                    }
+                </select>
+            </div>
+            <button class="tl-btn tl-btn-brand" @onclick="Export" disabled="@(selectedTestId == null)">
+                <TLIcon Name="download" Size="18" /> Download CSV
+            </button>
+        </div>
+
+        @if (!string.IsNullOrEmpty(message))
+        {
+            <p class="tl-export-msg">@message</p>
+        }
+    </div>
 }
 
 @code {

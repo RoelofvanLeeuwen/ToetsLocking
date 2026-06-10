@@ -1,4 +1,4 @@
-﻿@page "/"
+@page "/"
 @using Microsoft.AspNetCore.SignalR.Client
 @using StudentWifiMonitoring.Web.Domain
 @using StudentWifiMonitoring.Web.DTOs.Dashboard
@@ -13,195 +13,201 @@
 @inject StudentWifiMonitoring.Web.Services.Interfaces.IMyScreenService MyScreenService
 @implements IAsyncDisposable
 
-<PageTitle>Docent Dashboard</PageTitle>
+<PageTitle>Dashboard — Toetslocker</PageTitle>
 
 @if (!isTeacher)
 {
-    <div class="container mt-4">
-        <div class="alert alert-warning mt-5">
-            <h4 class="alert-heading">🔒 Geen toegang</h4>
-            <p class="mb-0">Deze pagina is alleen beschikbaar voor docenten.</p>
-        </div>
+    <div class="tl-empty">
+        <div class="ic"><TLIcon Name="lock" Size="32" /></div>
+        <h3>Geen toegang</h3>
+        <p>Deze pagina is alleen beschikbaar voor docenten.</p>
     </div>
 }
 else
 {
-<div class="container mt-4">
-    <div class="card">
-        <div class="card-header bg-primary text-white">
-            <h3>📊 Docent Dashboard</h3>
-            <small class="text-white-50">Realtime monitoring van verbonden studenten</small>
+    <div class="tl-ph">
+        <h1>Dashboard</h1>
+        <p>Realtime monitoring van verbonden studenten</p>
+    </div>
+
+    <div class="tl-toolbar">
+        <div class="tl-sel-wrap">
+            <label>Actieve toets</label>
+            <select @bind="selectedTestId" @bind:after="OnTestChanged">
+                <option value="">— Kies een toets —</option>
+                @foreach (TestSessionDto t in tests)
+                {
+                    <option value="@t.Id">@t.Name (@t.StartTime.ToLocalTime().ToString("HH:mm") – @t.EndTime.ToLocalTime().ToString("HH:mm"))</option>
+                }
+            </select>
         </div>
-        <div class="card-body">
-            <div class="mb-3">
-                <label class="form-label">Selecteer Toets:</label>
-                <select class="form-select" @bind="selectedTestId" @bind:after="OnTestChanged">
-                    <option value="">-</option>
-                    @foreach (TestSessionDto t in tests)
-                    {
-                        <option value="@t.Id">@t.Name (@t.StartTime.ToLocalTime():HH:mm) - (@t.EndTime.ToLocalTime():HH:mm))</option>
-                    }
-                </select>
+        <div class="tl-signal">
+            <i></i>
+            <span class="lbl">SignalR</span>
+            @(_isConnected ? "Verbonden" : "Niet verbonden")
+        </div>
+    </div>
+
+    <div class="tl-tiles d4">
+        <div class="tl-tile">
+            <span class="tl-tile-ic n"><TLIcon Name="users" Size="22" /></span>
+            <div><div class="v">@(students?.Count ?? 0)</div><div class="k">Totaal</div></div>
+        </div>
+        <div class="tl-tile">
+            <span class="tl-tile-ic g"><TLIcon Name="wifi" Size="22" /></span>
+            <div><div class="v">@(students?.Count(s => s.IsOnline && !s.IsTestComplete) ?? 0)</div><div class="k">Verbonden</div></div>
+        </div>
+        <div class="tl-tile">
+            <span class="tl-tile-ic t"><TLIcon Name="flag" Size="22" /></span>
+            <div><div class="v">@(students?.Count(s => s.IsTestComplete) ?? 0)</div><div class="k">Klaar</div></div>
+        </div>
+        <div class="tl-tile">
+            <span class="tl-tile-ic r"><TLIcon Name="wifi-off" Size="22" /></span>
+            <div><div class="v">@(students?.Count(s => !s.IsOnline && !s.IsTestComplete) ?? 0)</div><div class="k">Verbroken</div></div>
+        </div>
+    </div>
+
+    <div class="tl-panel">
+        <div class="tl-panel-head">
+            <span class="tl-panel-title">Studenten</span>
+        </div>
+
+        @if (students == null)
+        {
+            <div class="tl-empty">
+                <p>Laden…</p>
             </div>
-
-            @if (_connectionStatus != null)
-            {
-                <div class="alert alert-info alert-sm mb-3">
-                    <small>
-                        <strong>SignalR Status:</strong> @_connectionStatus
-                        @if (_isConnected)
-                        {
-                            <span class="badge bg-success ms-2">🟢 Verbonden</span>
-                        }
-                        else
-                        {
-                            <span class="badge bg-danger ms-2">🔴 Niet verbonden</span>
-                        }
-                    </small>
-                </div>
-            }
-
-            @if (students == null)
-            {
-                <div class="text-center py-4">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Laden...</span>
-                    </div>
-                    <p class="mt-2">Studenten laden...</p>
-                </div>
-            }
-            else if (students.Count == 0)
-            {
+        }
+        else if (students.Count == 0)
+        {
+            <div class="tl-empty">
+                <div class="ic"><TLIcon Name="users" Size="32" /></div>
                 @if (!selectedTestId.HasValue)
                 {
-                    <div class="alert alert-info">
-                        <strong>Geen actieve toets.</strong>
-                        <p class="mb-0">Selecteer een toets in het dropdown-menu om de studenten te bekijken.</p>
-                    </div>
+                    <h3>Selecteer een toets</h3>
+                    <p>Kies een toets in het dropdown-menu om de studenten te bekijken.</p>
                 }
                 else
                 {
-                    <div class="alert alert-warning">
-                        <strong>Geen studenten gevonden.</strong>
-                        <p class="mb-0">Er zijn nog geen studenten geregistreerd voor deze toets. Ga naar <a href="/register">/register</a> om studenten aan te melden.</p>
-                    </div>
+                    <h3>Geen studenten</h3>
+                    <p>Er zijn nog geen studenten geregistreerd voor deze toets.</p>
                 }
-            }
-            else
-            {
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Status</th>
-                                <th>Naam</th>
-                                <th>Toets</th>
-                                <th>MAC-adres</th>
+            </div>
+        }
+        else
+        {
+            <div class="tl-tablewrap">
+                <table class="tl-dtable">
+                    <thead>
+                        <tr>
+                            <th>Status</th>
+                            <th>Naam</th>
+                            <th>Toets</th>
+                            <th>MAC-adres</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (StudentStatusDto s in students.OrderByDescending(st => st.IsOnline && !st.IsTestComplete).ThenByDescending(st => st.IsTestComplete).ThenByDescending(st => st.LastConnectedAt))
+                        {
+                            <tr class="row" @onclick="() => OpenStudentDetail(s)">
+                                <td>
+                                    <div class="tl-status-cell">
+                                        @if (s.IsTestComplete)
+                                        {
+                                            <span class="tl-spill klaar"><i></i>Klaar</span>
+                                        }
+                                        else if (s.IsOnline)
+                                        {
+                                            <span class="tl-spill verbonden"><i></i>Verbonden</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="tl-spill niet"><i></i>Niet verbonden</span>
+                                        }
+                                        @if (s.DisconnectionCount > 0)
+                                        {
+                                            <span class="tl-dc-badge"><TLIcon Name="alert" Size="12" /> @s.DisconnectionCount×</span>
+                                        }
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="tl-name-cell">
+                                        <div class="av" style="background:linear-gradient(135deg,#6D5BFF,#4A2EE0)">@GetStudentInitials(s.Name)</div>
+                                        <span class="nm">@s.Name</span>
+                                    </div>
+                                </td>
+                                <td>@s.TestName</td>
+                                <td class="tl-mac-cell">@s.MacAddress</td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (StudentStatusDto s in students.OrderByDescending(st => !st.IsOnline).ThenByDescending(st => st.LastConnectedAt))
-                                {
-                                    <tr class="@(s.IsOnline ? "table-success" : "")" style="cursor:pointer" @onclick="() => OpenStudentDetail(s)" title="Klik voor activiteitenlog">
-                                        <td>
-                                            @if (s.IsTestComplete)
-                                            {
-                                                <span class="badge bg-success">✅ Klaar</span>
-                                            }
-                                            else if (s.IsOnline)
-                                            {
-                                                <span class="badge bg-success">🟢 Verbonden</span>
-                                            }
-                                            else
-                                            {
-                                                <span class="badge bg-secondary">⚪ Niet verbonden</span>
-                                            }
-                                            @if (s.DisconnectionCount > 0)
-                                            {
-                                                <span class="badge bg-warning text-dark ms-1" title="@s.DisconnectionCount keer verbroken">⚠️ @s.DisconnectionCount×</span>
-                                            }
-                                        </td>
-                                        <td><strong>@s.Name</strong></td>
-                                        <td>@s.TestName</td>
-                                        <td><code class="small">@s.MacAddress</code></td>
-                                    </tr>
-                                }
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="mt-3">
-                    <small class="text-muted">
-                            <strong>Totaal:</strong> @students.Count student(en) | 
-                            <strong class="text-success">Verbonden:</strong> @students.Count(s => s.IsOnline) | 
-                            <strong class="text-secondary">Niet verbonden:</strong> @students.Count(s => !s.IsOnline)
-                        </small>
-                </div>
-            }
-        </div>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="tl-totals">
+                <span>Totaal: <b>@students.Count</b></span>
+                <span class="g">Verbonden: <b>@students.Count(s => s.IsOnline && !s.IsTestComplete)</b></span>
+                <span>Klaar: <b>@students.Count(s => s.IsTestComplete)</b></span>
+                <span class="gr">Verbroken: <b>@students.Count(s => !s.IsOnline && !s.IsTestComplete)</b></span>
+            </div>
+        }
     </div>
-</div>
+}
 
 @if (selectedStudent != null)
 {
-    <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5)" @onclick="CloseStudentDetail">
-        <div class="modal-dialog modal-lg" @onclick:stopPropagation="true">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Activiteiten — @selectedStudent.Name</h5>
-                    <button type="button" class="btn-close" @onclick="CloseStudentDetail"></button>
+    <div class="tl-modal-scrim" @onclick="CloseStudentDetail">
+        <div class="tl-modal" @onclick:stopPropagation="true">
+            <div class="tl-modal-head">
+                <div class="av">@GetStudentInitials(selectedStudent.Name)</div>
+                <div>
+                    <div class="t">@selectedStudent.Name</div>
+                    <div class="s">Activiteitenlog</div>
                 </div>
-                <div class="modal-body">
-                    @if (studentActivity == null || !studentActivity.Any())
-                    {
-                        <p class="text-muted">Geen activiteiten gevonden voor deze student.</p>
-                    }
-                    else
-                    {
-                        <table class="table table-sm mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Tijdstip</th>
-                                    <th>Naam</th>
-                                    <th>Gebeurtenis</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (StudentActivityDto a in studentActivity)
+                <button class="x" @onclick="CloseStudentDetail"><TLIcon Name="close" Size="18" /></button>
+            </div>
+            <div class="tl-modal-body">
+                @if (studentActivity == null || !studentActivity.Any())
+                {
+                    <p style="color:var(--tl-ink-3);padding:16px 0">Geen activiteiten gevonden voor deze student.</p>
+                }
+                else
+                {
+                    <ul class="tl-tl">
+                        @foreach (StudentActivityDto a in studentActivity)
+                        {
+                            <li>
+                                @if (a.EventType == EventType.Disconnected)
                                 {
-                                    <tr class="@(a.EventType == EventType.Disconnected ? "table-warning" : a.EventType == EventType.TestCompleted ? "table-info" : "table-success")">
-                                        <td>@a.Timestamp.ToLocalTime().ToString("HH:mm:ss")</td>
-                                        <td><strong>@a.StudentName</strong></td>
-                                        <td>
-                                            @if (a.EventType == EventType.Disconnected)
-                                            {
-                                                <span>🔴 Verbinding verbroken</span>
-                                            }
-                                            else if (a.EventType == EventType.TestCompleted)
-                                            {
-                                                <span>🏁 Ik ben klaar</span>
-                                            }
-                                            else
-                                            {
-                                                <span>🟢 Verbonden</span>
-                                            }
-                                        </td>
-                                    </tr>
+                                    <span class="dot verbroken"></span>
+                                    <span class="time">@a.Timestamp.ToLocalTime().ToString("HH:mm:ss")</span>
+                                    <span class="ev verbroken">Verbinding verbroken</span>
                                 }
-                            </tbody>
-                        </table>
-                    }
-                </div>
-                <div class="modal-footer">
-                    <small class="text-muted me-auto">
-                        @(studentActivity?.Count(a => a.EventType == EventType.Disconnected) ?? 0) verbroken verbinding(en)
-                    </small>
-                    <button type="button" class="btn btn-secondary" @onclick="CloseStudentDetail">Sluiten</button>
-                </div>
+                                else if (a.EventType == EventType.TestCompleted)
+                                {
+                                    <span class="dot klaar"></span>
+                                    <span class="time">@a.Timestamp.ToLocalTime().ToString("HH:mm:ss")</span>
+                                    <span class="ev">Ik ben klaar</span>
+                                }
+                                else
+                                {
+                                    <span class="dot verbonden"></span>
+                                    <span class="time">@a.Timestamp.ToLocalTime().ToString("HH:mm:ss")</span>
+                                    <span class="ev">Verbonden — @a.StudentName</span>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+            <div class="tl-modal-foot">
+                <span class="ct">
+                    <TLIcon Name="alert" Size="14" />
+                    @(studentActivity?.Count(a => a.EventType == EventType.Disconnected) ?? 0) verbroken verbinding(en)
+                </span>
+                <button class="tl-btn tl-btn-ghost" style="margin-left:auto" @onclick="CloseStudentDetail">Sluiten</button>
             </div>
         </div>
     </div>
-}
 }
 
 @code {
@@ -418,6 +424,13 @@ else
     {
         selectedStudent = null;
         studentActivity = null;
+    }
+
+    private static string GetStudentInitials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        var words = name.Split(' ', System.StringSplitOptions.RemoveEmptyEntries);
+        return string.Concat(words.Take(2).Select(w => char.ToUpper(w[0])));
     }
 
     /// <summary>

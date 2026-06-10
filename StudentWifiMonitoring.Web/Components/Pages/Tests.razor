@@ -1,4 +1,4 @@
-﻿@page "/tests"
+@page "/tests"
 @rendermode InteractiveServer
 @using StudentWifiMonitoring.Web.DTOs.Tests
 @using StudentWifiMonitoring.Web.Services.Interfaces
@@ -7,340 +7,232 @@
 @inject PersistentComponentState AppState
 @inject ILogger<Tests> Logger
 
-<PageTitle>Beheer Toetsen</PageTitle>
+<PageTitle>Toetsen — Toetslocker</PageTitle>
 
 @if (!isTeacher)
 {
-    <div class="container mt-4">
-        <div class="alert alert-warning mt-5">
-            <h4 class="alert-heading">🔒 Geen toegang</h4>
-            <p class="mb-0">Deze pagina is alleen beschikbaar voor docenten.</p>
-        </div>
+    <div class="tl-empty">
+        <div class="ic"><TLIcon Name="lock" Size="32" /></div>
+        <h3>Geen toegang</h3>
+        <p>Deze pagina is alleen beschikbaar voor docenten.</p>
     </div>
 }
 else
 {
-<!-- Bevestigingsmodal voor inactief zetten -->
-@if (showConfirmModal && testToDeactivate != null)
-{
-    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header bg-warning text-dark">
-                    <h5 class="modal-title">⚠️ Toets Inactief Zetten</h5>
-                    <button type="button" class="btn-close" @onclick="CancelDeactivate"></button>
+    @if (showConfirmModal && testToDeactivate != null)
+    {
+        <div class="tl-modal-scrim" @onclick="CancelDeactivate">
+            <div class="tl-modal tl-confirm-modal" @onclick:stopPropagation="true">
+                <div class="tl-modal-head">
+                    <TLIcon Name="alert" Size="20" />
+                    <div class="t">Toets inactief zetten</div>
+                    <button class="x" @onclick="CancelDeactivate"><TLIcon Name="close" Size="18" /></button>
                 </div>
-                <div class="modal-body">
-                    <p><strong>Let op:</strong> Je staat op het punt om de volgende toets inactief te zetten:</p>
-                    <div class="alert alert-info">
-                        <strong>@testToDeactivate.Name</strong><br/>
-                        <small>@testToDeactivate.StartTime.ToLocalTime().ToString("dd-MM-yyyy HH:mm") - @testToDeactivate.EndTime.ToLocalTime().ToString("dd-MM-yyyy HH:mm")</small>
+                <div class="tl-modal-body">
+                    <div class="tl-confirm-item">
+                        <strong>@testToDeactivate.Name</strong>
+                        <small>@testToDeactivate.StartTime.ToLocalTime().ToString("dd-MM-yyyy HH:mm") – @testToDeactivate.EndTime.ToLocalTime().ToString("dd-MM-yyyy HH:mm")</small>
                     </div>
-                    <p class="text-danger mb-0">
-                        <strong>⚠️ Alle momenteel verbonden studenten worden automatisch gedisconnect!</strong>
-                    </p>
+                    <div class="tl-confirm-warn">
+                        <TLIcon Name="alert" Size="16" /> Alle momenteel verbonden studenten worden automatisch gedisconnect!
+                    </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" @onclick="CancelDeactivate">
-                        ❌ Annuleren
-                    </button>
-                    <button type="button" class="btn btn-warning" @onclick="ConfirmDeactivateAsync">
-                        ⏹️ Ja, Inactief Zetten
+                <div class="tl-modal-foot">
+                    <button class="tl-btn tl-btn-ghost" @onclick="CancelDeactivate">Annuleren</button>
+                    <button class="tl-btn tl-btn-red" style="margin-left:10px" @onclick="ConfirmDeactivateAsync">
+                        <TLIcon Name="stop" Size="16" /> Ja, inactief zetten
                     </button>
                 </div>
             </div>
         </div>
+    }
+
+    <div class="tl-ph">
+        <h1>Toetsen</h1>
+        <p>Aanmaken, bewerken en beheren van toetssessies</p>
     </div>
-}
 
-<div class="container mt-4">
-    <div class="card">
-        <div class="card-header bg-primary text-white">
-            <h3>📝 Beheer Toetsen</h3>
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="tl-confirm-warn" style="margin-bottom:16px">
+            <TLIcon Name="alert" Size="16" /> @errorMessage
+            <button style="margin-left:auto;background:none;border:none;cursor:pointer;color:inherit" @onclick="() => errorMessage = string.Empty"><TLIcon Name="close" Size="16" /></button>
         </div>
-        <div class="card-body">
-            @if (!string.IsNullOrEmpty(errorMessage))
-            {
-                <div class="alert alert-danger alert-dismissible fade show">
-                    @errorMessage
-                    <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+    }
+
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="tl-alert-ok">
+            <TLIcon Name="check" Size="18" /> @successMessage
+            <button class="x" @onclick="() => successMessage = string.Empty"><TLIcon Name="close" Size="16" /></button>
+        </div>
+    }
+
+    @if (editingTest == null)
+    {
+        <div class="tl-formcard">
+            <div class="tl-card-h">
+                <div class="ic"><TLIcon Name="plus" Size="18" /></div>
+                Nieuwe toets aanmaken
+            </div>
+            <div class="tl-fld">
+                <label>Toetsnaam</label>
+                <input type="text" class="tl-in" @bind="newName" placeholder="Voer toetsnaam in" />
+            </div>
+            <div class="tl-grid2">
+                <div class="tl-fld">
+                    <label>Starttijd (lokale tijd)</label>
+                    <input type="datetime-local" class="tl-in" @bind="startTimeLocal" />
                 </div>
-            }
-
-            @if (!string.IsNullOrEmpty(successMessage))
-            {
-                <div class="alert alert-success alert-dismissible fade show">
-                    @successMessage
-                    <button type="button" class="btn-close" @onclick="() => successMessage = string.Empty"></button>
+                <div class="tl-fld">
+                    <label>Eindtijd (lokale tijd)</label>
+                    <input type="datetime-local" class="tl-in" @bind="endTimeLocal" />
                 </div>
-            }
+            </div>
+            <button class="tl-btn tl-btn-brand" @onclick="CreateTestAsync">
+                <TLIcon Name="plus" Size="18" /> Toets aanmaken
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="tl-formcard" style="border-color:#F8E2AE">
+            <div class="tl-card-h">
+                <div class="ic" style="background:#FEF3DA;color:#97650A"><TLIcon Name="edit" Size="18" /></div>
+                Toets bewerken
+            </div>
+            <div class="tl-fld">
+                <label>Toetsnaam</label>
+                <input type="text" class="tl-in" @bind="editName" placeholder="Voer toetsnaam in" />
+            </div>
+            <div class="tl-grid2">
+                <div class="tl-fld">
+                    <label>Starttijd (lokale tijd)</label>
+                    <input type="datetime-local" class="tl-in" @bind="editStartTimeLocal" />
+                </div>
+                <div class="tl-fld">
+                    <label>Eindtijd (lokale tijd)</label>
+                    <input type="datetime-local" class="tl-in" @bind="editEndTimeLocal" />
+                </div>
+            </div>
+            <div style="display:flex;gap:10px">
+                <button class="tl-btn tl-btn-brand" @onclick="SaveEditAsync">
+                    <TLIcon Name="check" Size="18" /> Opslaan
+                </button>
+                <button class="tl-btn tl-btn-ghost" @onclick="CancelEdit">
+                    <TLIcon Name="close" Size="18" /> Annuleren
+                </button>
+            </div>
+        </div>
+    }
 
-            @if (editingTest == null)
+    <div class="tl-listcard">
+        <div class="tl-card-h">
+            <div class="ic"><TLIcon Name="list" Size="18" /></div>
+            Bestaande toetsen
+            @if (!string.IsNullOrEmpty(searchTerm))
             {
-                <!-- Nieuwe Toets Aanmaken -->
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <h5 class="card-title">➕ Nieuwe Toets Aanmaken</h5>
-                        
-                        <div class="mb-3">
-                            <label for="testName" class="form-label">Toetsnaam:</label>
-                            <input type="text" 
-                                   class="form-control" 
-                                   id="testName" 
-                                   @bind="newName" 
-                                   placeholder="Voer toetsnaam in" />
+                <button class="tl-btn tl-btn-ghost" style="margin-left:auto;padding:6px 12px;font-size:13px" @onclick="ClearSearchAsync">
+                    <TLIcon Name="refresh" Size="14" /> Toon alle
+                </button>
+            }
+        </div>
+
+        <div class="tl-search-bar">
+            <TLIcon Name="search" Size="16" />
+            <input type="text"
+                   placeholder="Zoek op toetsnaam…"
+                   @bind="searchTerm"
+                   @bind:event="oninput"
+                   @bind:after="OnSearchChangedAsync" />
+        </div>
+
+        @if (isLoading)
+        {
+            <div class="tl-empty">
+                <p>Laden…</p>
+            </div>
+        }
+        else if (pagedResult == null || pagedResult.Items.Count == 0)
+        {
+            <div class="tl-empty">
+                <div class="ic"><TLIcon Name="doc" Size="32" /></div>
+                @if (string.IsNullOrEmpty(searchTerm))
+                {
+                    <h3>Nog geen toetsen</h3>
+                    <p>Maak je eerste toets aan met het formulier hierboven.</p>
+                }
+                else
+                {
+                    <h3>Geen resultaten</h3>
+                    <p>Geen toetsen gevonden voor "<strong>@searchTerm</strong>".</p>
+                    <a @onclick="ClearSearchAsync" @onclick:preventDefault style="cursor:pointer">Toon alle toetsen</a>
+                }
+            </div>
+        }
+        else
+        {
+            @foreach (var t in pagedResult.Items)
+            {
+                var isActive = t.IsActive;
+                <div class="tl-toets-item @(isActive ? "active" : "")">
+                    <div class="info">
+                        <div class="tn">
+                            @t.Name
+                            @if (isActive)
+                            {
+                                <span class="tl-badge-st act">ACTIEF</span>
+                            }
+                            else
+                            {
+                                <span class="tl-badge-st inact">INACTIEF</span>
+                            }
                         </div>
-
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="startTime" class="form-label">Starttijd (lokale tijd):</label>
-                                <input type="datetime-local" 
-                                       class="form-control" 
-                                       id="startTime" 
-                                       @bind="startTimeLocal" />
-                            </div>
-
-                            <div class="col-md-6 mb-3">
-                                <label for="endTime" class="form-label">Eindtijd (lokale tijd):</label>
-                                <input type="datetime-local" 
-                                       class="form-control" 
-                                       id="endTime" 
-                                       @bind="endTimeLocal" />
-                            </div>
+                        <div class="meta">
+                            <span><TLIcon Name="calendar" Size="13" /> Start: <b>@t.StartTime.ToLocalTime().ToString("dd-MM-yyyy HH:mm")</b></span>
+                            <span><TLIcon Name="flag" Size="13" /> Eind: <b>@t.EndTime.ToLocalTime().ToString("dd-MM-yyyy HH:mm")</b></span>
                         </div>
-
-                        <button class="btn btn-primary" @onclick="CreateTestAsync">
-                            ➕ Toets Aanmaken
+                    </div>
+                    <div class="acts">
+                        @if (isActive)
+                        {
+                            <button class="tl-btn tl-deact-btn"
+                                    @onclick="() => ShowDeactivateConfirmAsync(t)"
+                                    disabled="@(editingTest != null)">
+                                <TLIcon Name="stop" Size="16" /> Inactief
+                            </button>
+                        }
+                        <button class="tl-btn tl-btn-ghost"
+                                @onclick="() => StartEdit(t)"
+                                disabled="@(editingTest != null)">
+                            <TLIcon Name="edit" Size="16" /> Bewerken
                         </button>
                     </div>
                 </div>
             }
-            else
+
+            @if (pagedResult.TotalPages > 1)
             {
-                <!-- Toets Bewerken -->
-                <div class="card mb-4 border-warning">
-                    <div class="card-body">
-                        <h5 class="card-title">✏️ Toets Bewerken</h5>
-                        
-                        <div class="mb-3">
-                            <label for="editName" class="form-label">Toetsnaam:</label>
-                            <input type="text" 
-                                   class="form-control" 
-                                   id="editName" 
-                                   @bind="editName" 
-                                   placeholder="Voer toetsnaam in" />
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="editStartTime" class="form-label">Starttijd (lokale tijd):</label>
-                                <input type="datetime-local" 
-                                       class="form-control" 
-                                       id="editStartTime" 
-                                       @bind="editStartTimeLocal" />
-                            </div>
-
-                            <div class="col-md-6 mb-3">
-                                <label for="editEndTime" class="form-label">Eindtijd (lokale tijd):</label>
-                                <input type="datetime-local" 
-                                       class="form-control" 
-                                       id="editEndTime" 
-                                       @bind="editEndTimeLocal" />
-                            </div>
-                        </div>
-
-                        <div class="d-flex gap-2">
-                            <button class="btn btn-success" @onclick="SaveEditAsync">
-                                💾 Opslaan
-                            </button>
-                            <button class="btn btn-secondary" @onclick="CancelEdit">
-                                ❌ Annuleren
-                            </button>
-                        </div>
-                    </div>
+                <div class="tl-pager">
+                    <button @onclick="PreviousPageAsync" disabled="@(!pagedResult.HasPreviousPage)">&#8592; Vorige</button>
+                    @for (int i = 1; i <= pagedResult.TotalPages; i++)
+                    {
+                        var pageNumber = i;
+                        <button class="@(pagedResult.PageNumber == pageNumber ? "active" : "")" @onclick="() => GoToPageAsync(pageNumber)">@pageNumber</button>
+                    }
+                    <button @onclick="NextPageAsync" disabled="@(!pagedResult.HasNextPage)">Volgende &#8594;</button>
                 </div>
             }
 
-            <!-- Bestaande Toetsen met Zoeken en Paginatie -->
-            <div class="card">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="card-title mb-0">📋 Bestaande Toetsen</h5>
-                        @if (!string.IsNullOrEmpty(searchTerm))
-                        {
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="ClearSearchAsync">
-                                🔄 Toon Alle Toetsen
-                            </button>
-                        }
-                    </div>
-                    
-                    <!-- Zoekbalk -->
-                    <div class="mb-3">
-                        <div class="input-group">
-                            <span class="input-group-text">🔍</span>
-                            <input type="text" 
-                                   class="form-control" 
-                                   placeholder="Zoek op toetsnaam..." 
-                                   @bind="searchTerm"
-                                   @bind:event="oninput"
-                                   @bind:after="OnSearchChangedAsync" />
-                            @if (!string.IsNullOrEmpty(searchTerm))
-                            {
-                                <button class="btn btn-outline-secondary" @onclick="ClearSearchAsync" title="Zoekfilter wissen">
-                                    ❌
-                                </button>
-                            }
-                        </div>
-                        @if (!string.IsNullOrEmpty(searchTerm))
-                        {
-                            <small class="text-muted">
-                                Zoeken naar: <strong>"@searchTerm"</strong>
-                            </small>
-                        }
-                    </div>
-
-                    @if (isLoading)
-                    {
-                        <div class="text-center py-5">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Laden...</span>
-                            </div>
-                            <p class="mt-2 text-muted">Toetsen laden...</p>
-                        </div>
-                    }
-                    else if (pagedResult == null || pagedResult.Items.Count == 0)
-                    {
-                        <!-- Verbeterde lege-state berichten -->
-                        <div class="text-center py-5">
-                            @if (string.IsNullOrEmpty(searchTerm))
-                            {
-                                <div class="mb-3">
-                                    <span style="font-size: 64px;">📝</span>
-                                </div>
-                                <h5>Nog geen toetsen aangemaakt</h5>
-                                <p class="text-muted">Maak je eerste toets aan met het formulier hierboven.</p>
-                            }
-                            else
-                            {
-                                <div class="mb-3">
-                                    <span style="font-size: 64px;">🔍</span>
-                                </div>
-                                <h5>Geen resultaten gevonden</h5>
-                                <p class="text-muted">
-                                    Er zijn geen toetsen gevonden die voldoen aan "<strong>@searchTerm</strong>".
-                                </p>
-                                <button class="btn btn-primary" @onclick="ClearSearchAsync">
-                                    🔄 Toon Alle Toetsen
-                                </button>
-                            }
-                        </div>
-                    }
-                    else
-                    {
-                        <!-- Toetsenlijst met verbeterde statusweergave en actieknoppen -->
-                        <div class="list-group mb-3">
-                            @foreach (var t in pagedResult.Items)
-                            {
-                                var isActive = t.IsActive;
-                                <div class="list-group-item @(isActive ? "border-success border-2" : "")">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <div class="flex-grow-1">
-                                            <div class="d-flex align-items-center mb-2">
-                                                <h6 class="mb-0 me-2">@t.Name</h6>
-                                                @if (isActive)
-                                                {
-                                                    <span class="badge bg-success" style="font-size: 0.9em;">
-                                                        <i class="bi bi-circle-fill" style="font-size: 0.6em;"></i> ACTIEF
-                                                    </span>
-                                                }
-                                                else
-                                                {
-                                                    <span class="badge bg-secondary" style="font-size: 0.9em;">
-                                                        <i class="bi bi-circle" style="font-size: 0.6em;"></i> INACTIEF
-                                                    </span>
-                                                }
-                                            </div>
-                                            <div class="text-muted small">
-                                                <div>
-                                                    <strong>📅 Start:</strong> @t.StartTime.ToLocalTime().ToString("dd-MM-yyyy HH:mm")
-                                                </div>
-                                                <div>
-                                                    <strong>🏁 Eind:</strong> @t.EndTime.ToLocalTime().ToString("dd-MM-yyyy HH:mm")
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="d-flex flex-column gap-2" style="min-width: 160px;">
-                                            @if (isActive)
-                                            {
-                                                <button class="btn btn-sm btn-warning w-100" 
-                                                        @onclick="() => ShowDeactivateConfirmAsync(t)"
-                                                        disabled="@(editingTest != null)"
-                                                        title="Zet deze actieve toets op inactief (studenten worden gedisconnect)">
-                                                    <strong>⏹️ Inactief Zetten</strong>
-                                                </button>
-                                            }
-                                            <button class="btn btn-sm btn-outline-primary w-100" 
-                                                    @onclick="() => StartEdit(t)"
-                                                    disabled="@(editingTest != null)"
-                                                    title="Bewerk deze toets">
-                                                ✏️ Bewerken
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            }
-                        </div>
-
-                        <!-- Paginatie -->
-                        @if (pagedResult.TotalPages > 1)
-                        {
-                            <nav aria-label="Toetsen paginatie">
-                                <ul class="pagination justify-content-center mb-3">
-                                    <li class="page-item @(!pagedResult.HasPreviousPage ? "disabled" : "")">
-                                        <button class="page-link" @onclick="PreviousPageAsync" disabled="@(!pagedResult.HasPreviousPage)">
-                                            « Vorige
-                                        </button>
-                                    </li>
-                                    
-                                    @for (int i = 1; i <= pagedResult.TotalPages; i++)
-                                    {
-                                        var pageNumber = i;
-                                        <li class="page-item @(pagedResult.PageNumber == pageNumber ? "active" : "")">
-                                            <button class="page-link" @onclick="() => GoToPageAsync(pageNumber)">
-                                                @pageNumber
-                                            </button>
-                                        </li>
-                                    }
-                                    
-                                    <li class="page-item @(!pagedResult.HasNextPage ? "disabled" : "")">
-                                        <button class="page-link" @onclick="NextPageAsync" disabled="@(!pagedResult.HasNextPage)">
-                                            Volgende »
-                                        </button>
-                                    </li>
-                                </ul>
-                            </nav>
-                        }
-
-                        <!-- Statistieken -->
-                        <div class="text-center">
-                            <small class="text-muted">
-                                @if (pagedResult.TotalPages > 1)
-                                {
-                                    <text>Pagina @pagedResult.PageNumber van @pagedResult.TotalPages | </text>
-                                }
-                                <strong>@pagedResult.TotalCount</strong> toets@(pagedResult.TotalCount != 1 ? "en" : "")
-                                @if (!string.IsNullOrEmpty(searchTerm))
-                                {
-                                    <text> gevonden</text>
-                                }
-                            </small>
-                        </div>
-                    }
-                </div>
-            </div>
-        </div>
+            <p class="tl-pager-info">
+                @if (pagedResult.TotalPages > 1)
+                {
+                    <text>Pagina @pagedResult.PageNumber van @pagedResult.TotalPages · </text>
+                }
+                <strong>@pagedResult.TotalCount</strong> toets@(pagedResult.TotalCount != 1 ? "en" : "")
+            </p>
+        }
     </div>
-</div>
 }
 
 @code {
@@ -562,11 +454,11 @@ else
 
             if (result.DisconnectedStudentsCount > 0)
             {
-                successMessage = $"✅ Toets '{result.TestName}' is inactief gezet en {result.DisconnectedStudentsCount} actieve verbinding(en) zijn gesloten.";
+                successMessage = $"Toets '{result.TestName}' is inactief gezet en {result.DisconnectedStudentsCount} actieve verbinding(en) zijn gesloten.";
             }
             else
             {
-                successMessage = $"✅ Toets '{result.TestName}' is inactief gezet.";
+                successMessage = $"Toets '{result.TestName}' is inactief gezet.";
             }
         }
         catch (Exception ex)
@@ -628,7 +520,7 @@ else
             if (result.Success)
             {
                 await LoadTestsAsync();
-                successMessage = $"✅ Toets '{editName.Trim()}' succesvol bijgewerkt.";
+                successMessage = $"Toets '{editName.Trim()}' succesvol bijgewerkt.";
 
                 // Reset edit mode
                 editingTest = null;

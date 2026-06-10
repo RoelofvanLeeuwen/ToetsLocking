@@ -1,101 +1,24 @@
 @inject IWebHostEnvironment HostEnvironment
-@inject StudentWifiMonitoring.Web.Services.Interfaces.ITeacherAuthService TeacherAuth
-@inject IHttpContextAccessor HttpContextAccessor
-@inject StudentWifiMonitoring.Web.Services.IMacResolver MacResolver
-@inject StudentWifiMonitoring.Web.Services.Interfaces.IMyScreenService MyScreenService
-@inject StudentWifiMonitoring.Web.Services.StudentNavStateService NavState
-@implements IDisposable
 
-<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">Student Wifi Monitoring</a>
-    </div>
-</div>
+<NavLink href="" Match="NavLinkMatch.All" ActiveClass="active">
+    <span class="ic"><TLIcon Name="grid" Size="18" /></span>
+    Dashboard
+</NavLink>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+<NavLink href="tests" ActiveClass="active">
+    <span class="ic"><TLIcon Name="doc" Size="18" /></span>
+    Toetsen
+</NavLink>
 
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="flex-column">
-        @if (TeacherAuth.IsTeacher())
-        {
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                    <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Dashboard
-                </NavLink>
-            </div>
+<NavLink href="export-by-test" ActiveClass="active">
+    <span class="ic"><TLIcon Name="download" Size="18" /></span>
+    Export per toets
+</NavLink>
 
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="tests">
-                    <span class="bi bi-list-check" aria-hidden="true"></span> Toetsen
-                </NavLink>
-            </div>
-
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="export-by-test">
-                    <span class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></span> Export per Toets
-                </NavLink>
-            </div>
-
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="teacher">
-                    <span class="bi bi-box-arrow-right" aria-hidden="true"></span> Uitloggen
-                </NavLink>
-            </div>
-
-            @if (HostEnvironment.IsDevelopment())
-            {
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="dev/stations">
-                        <span class="bi bi-wrench" aria-hidden="true"></span> Dev Stations
-                    </NavLink>
-                </div>
-            }
-        }
-        else
-        {
-            @if (NavState.CanRegister)
-            {
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="register">
-                        <span class="bi bi-pencil-square" aria-hidden="true"></span> Registreren
-                    </NavLink>
-                </div>
-            }
-
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="myscreen">
-                    <span class="bi bi-display" aria-hidden="true"></span> Mijn Scherm
-                </NavLink>
-            </div>
-        }
-    </nav>
-</div>
-
-@code {
-    protected override async Task OnInitializedAsync()
-    {
-        NavState.OnChange += OnNavStateChanged;
-
-        try
-        {
-            var ip = HttpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
-            if (!string.IsNullOrEmpty(ip))
-            {
-                var mac = MacResolver.GetMacForIp(ip);
-                if (!string.IsNullOrEmpty(mac))
-                {
-                    var status = await MyScreenService.GetStudentConnectionStatusAsync(mac);
-                    NavState.SetCanRegister(!status.IsConnected || status.IsTestComplete);
-                }
-            }
-        }
-        catch
-        {
-            NavState.SetCanRegister(true);
-        }
-    }
-
-    private void OnNavStateChanged() => InvokeAsync(StateHasChanged);
-
-    public void Dispose() => NavState.OnChange -= OnNavStateChanged;
+@if (HostEnvironment.IsDevelopment())
+{
+    <NavLink href="dev/stations" ActiveClass="active">
+        <span class="ic"><TLIcon Name="cog" Size="18" /></span>
+        Dev Stations
+    </NavLink>
 }
