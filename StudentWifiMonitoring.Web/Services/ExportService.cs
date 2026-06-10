@@ -21,38 +21,6 @@ public class ExportService : IExportService
     }
 
     /// <summary>
-    /// Genereert een CSV-export van alle events in memory.
-    /// De inhoud wordt teruggegeven in de DTO zodat de browser de download direct kan starten.
-    /// Er worden geen bestanden op de server opgeslagen.
-    /// </summary>
-    public async Task<ExportResultDto> ExportAllAsync()
-    {
-        try
-        {
-            var csv = await CsvExporter.ExportAllAsync(_db);
-            var fileName = $"events-all-{DateTime.UtcNow:yyyyMMdd-HHmmss}.csv";
-
-            _logger.LogInformation("Export gegenereerd: {FileName}", fileName);
-
-            return new ExportResultDto
-            {
-                Success = true,
-                FileName = fileName,
-                CsvContent = csv
-            };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Fout bij exporteren van alle events");
-            return new ExportResultDto
-            {
-                Success = false,
-                ErrorMessage = "Er is een fout opgetreden bij het exporteren."
-            };
-        }
-    }
-
-    /// <summary>
     /// Haalt alle toetssessies op als DTO's voor gebruik in de exportpagina, gesorteerd op starttijd (nieuwste eerst).
     /// </summary>
     public List<TestSessionDto> GetTestSessions()

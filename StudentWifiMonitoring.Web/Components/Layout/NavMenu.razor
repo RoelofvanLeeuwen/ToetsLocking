@@ -1,4 +1,4 @@
-﻿@inject IWebHostEnvironment HostEnvironment
+@inject IWebHostEnvironment HostEnvironment
 @inject StudentWifiMonitoring.Web.Services.Interfaces.ITeacherAuthService TeacherAuth
 @inject IHttpContextAccessor HttpContextAccessor
 @inject StudentWifiMonitoring.Web.Services.IMacResolver MacResolver
@@ -16,21 +16,6 @@
 
 <div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
     <nav class="flex-column">
-        @if (NavState.CanRegister)
-        {
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="register">
-                    <span class="bi bi-pencil-square" aria-hidden="true"></span> Registreren
-                </NavLink>
-            </div>
-        }
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="myscreen">
-                <span class="bi bi-display" aria-hidden="true"></span> Mijn Scherm
-            </NavLink>
-        </div>
-
         @if (TeacherAuth.IsTeacher())
         {
             <div class="nav-item px-3">
@@ -42,18 +27,6 @@
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="tests">
                     <span class="bi bi-list-check" aria-hidden="true"></span> Toetsen
-                </NavLink>
-            </div>
-
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="status">
-                    <span class="bi bi-wifi" aria-hidden="true"></span> Status
-                </NavLink>
-            </div>
-
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="export">
-                    <span class="bi bi-download" aria-hidden="true"></span> Export
                 </NavLink>
             </div>
 
@@ -78,6 +51,22 @@
                 </div>
             }
         }
+        else
+        {
+            @if (NavState.CanRegister)
+            {
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="register">
+                        <span class="bi bi-pencil-square" aria-hidden="true"></span> Registreren
+                    </NavLink>
+                </div>
+            }
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="myscreen">
+                    <span class="bi bi-display" aria-hidden="true"></span> Mijn Scherm
+                </NavLink>
+            </div>
         }
     </nav>
 </div>
