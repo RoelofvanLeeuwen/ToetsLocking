@@ -5,13 +5,23 @@
 @inject IStudentRegistrationService RegistrationService
 @inject IHttpContextAccessor HttpContextAccessor
 @inject ILogger<Register> Logger
+@inject StudentWifiMonitoring.Web.Services.IMacResolver MacResolver
+@inject StudentWifiMonitoring.Web.Services.Interfaces.IMyScreenService MyScreenService
+@inject NavigationManager Nav
 
 <PageTitle>Registreren</PageTitle>
 
 <div class="container mt-4">
     <h2>Student Registratie</h2>
 
-    @if (_activeSession == null)
+    @if (_isStudentActiveInTest)
+    {
+        <div class="alert alert-warning mt-3">
+            <strong>Je bent al actief in een toets</strong>
+            <p class="mb-0">Je wordt al gemonitord. Ga naar <a href="/myscreen">Mijn Scherm</a> en klik op "Ik ben klaar" als je klaar bent met de toets.</p>
+        </div>
+    }
+    else if (_activeSession == null)
     {
         <div class="alert alert-warning mt-3">
             <strong>Geen actieve toets</strong>
@@ -75,10 +85,29 @@
     private string _errorMessage = string.Empty;
     private string _successMessage = string.Empty;
     private bool _isProcessing = false;
+    private bool _isStudentActiveInTest = false;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadActiveSessionAsync();
+        await CheckStudentActiveStatusAsync();
+    }
+
+    private async Task CheckStudentActiveStatusAsync()
+    {
+        try
+        {
+            var ip = HttpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
+            if (string.IsNullOrEmpty(ip)) return;
+            var mac = MacResolver.GetMacForIp(ip);
+            if (string.IsNullOrEmpty(mac)) return;
+            var status = await MyScreenService.GetStudentConnectionStatusAsync(mac);
+            _isStudentActiveInTest = status.IsConnected && !status.IsTestComplete;
+        }
+        catch
+        {
+            _isStudentActiveInTest = false;
+        }
     }
 
     /// <summary>
@@ -137,8 +166,8 @@
 
             if (result.Success)
             {
-                _successMessage = result.SuccessMessage ?? "Registratie succesvol.";
-                _studentName = string.Empty; // Reset form
+                Nav.NavigateTo("/myscreen");
+                return;
             }
             else
             {

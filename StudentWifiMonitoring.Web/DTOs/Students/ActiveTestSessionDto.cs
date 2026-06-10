@@ -6,6 +6,8 @@ namespace StudentWifiMonitoring.Web.DTOs.Students;
 /// </summary>
 public class ActiveTestSessionDto
 {
+    public int Id { get; set; }
+
     /// <summary>
     /// Naam van de actieve toets.
     /// </summary>

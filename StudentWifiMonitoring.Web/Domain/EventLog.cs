@@ -9,5 +9,6 @@
         public TestSession? TestSession { get; set; }
         public EventType EventType { get; set; }
         public DateTime Timestamp { get; set; }
+        public string StudentName { get; set; } = string.Empty;
     }
 }

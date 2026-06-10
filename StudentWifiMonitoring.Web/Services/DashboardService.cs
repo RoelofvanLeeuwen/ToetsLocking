@@ -91,7 +91,8 @@ public class DashboardService : IDashboardService
                     TestName = s.TestName,
                     IsOnline = onlineMacs.Contains(s.MacAddress),
                     DisconnectionCount = disconnectionCounts.GetValueOrDefault(s.Id, 0),
-                    LastConnectedAt = lastConnectionEvents.ContainsKey(s.Id) ? lastConnectionEvents[s.Id] : (DateTime?)null
+                    LastConnectedAt = lastConnectionEvents.ContainsKey(s.Id) ? lastConnectionEvents[s.Id] : (DateTime?)null,
+                    IsTestComplete = s.IsTestComplete
                 })
                 .ToList();
         }
@@ -122,7 +123,8 @@ public class DashboardService : IDashboardService
                     TestName = s.TestName,
                     IsOnline = onlineMacs.Contains(s.MacAddress),
                     DisconnectionCount = disconnectionCounts.GetValueOrDefault(s.Id, 0),
-                    LastConnectedAt = lastConnectionEvents.ContainsKey(s.Id) ? lastConnectionEvents[s.Id] : (DateTime?)null
+                    LastConnectedAt = lastConnectionEvents.ContainsKey(s.Id) ? lastConnectionEvents[s.Id] : (DateTime?)null,
+                    IsTestComplete = s.IsTestComplete
                 })
                 .ToList();
         }
@@ -144,7 +146,8 @@ public class DashboardService : IDashboardService
             .Select(e => new StudentActivityDto
             {
                 Timestamp = e.Timestamp,
-                EventType = e.EventType
+                EventType = e.EventType,
+                StudentName = e.StudentName
             })
             .ToList();
     }

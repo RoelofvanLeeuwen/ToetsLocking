@@ -9,6 +9,7 @@
 @inject IHttpContextAccessor HttpContextAccessor
 @inject NavigationManager Nav
 @inject IWebHostEnvironment Environment
+@inject StudentWifiMonitoring.Web.Services.StudentNavStateService NavState
 @implements IAsyncDisposable
 
 <PageTitle>Mijn Verbindingsstatus</PageTitle>
@@ -17,57 +18,68 @@
     body, html {
         margin: 0;
         padding: 0;
-        overflow: hidden;
     }
-    
+
     .fullscreen-status {
-        width: 100vw;
-        height: 100vh;
+        width: 100%;
+        min-height: 100dvh;
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
         text-align: center;
+        padding: 24px 16px;
+        box-sizing: border-box;
         transition: background-color 0.5s ease;
     }
-    
+
     .status-connected {
         background-color: #28a745;
         color: white;
     }
-    
+
     .status-disconnected {
         background-color: #dc3545;
         color: white;
     }
-    
+
+    .status-complete {
+        background-color: #17a2b8;
+        color: white;
+    }
+
     .status-icon {
-        font-size: 120px;
-        margin-bottom: 30px;
+        font-size: clamp(60px, 15vw, 120px);
+        margin-bottom: clamp(15px, 3vw, 30px);
+        line-height: 1;
     }
-    
+
     .status-title {
-        font-size: 48px;
+        font-size: clamp(28px, 8vw, 48px);
         font-weight: bold;
-        margin-bottom: 20px;
+        margin-bottom: clamp(10px, 2vw, 20px);
     }
-    
+
     .status-message {
-        font-size: 32px;
-        margin-bottom: 15px;
+        font-size: clamp(16px, 5vw, 32px);
+        margin-bottom: clamp(8px, 1.5vw, 15px);
+        padding: 0 8px;
     }
-    
+
     .status-details {
-        font-size: 24px;
+        font-size: clamp(14px, 4vw, 24px);
         opacity: 0.9;
-        margin-top: 20px;
+        margin-top: clamp(10px, 2vw, 20px);
+        line-height: 1.6;
     }
-    
+
     .status-mac {
         font-family: monospace;
-        font-size: 20px;
+        font-size: clamp(11px, 2.5vw, 20px);
         opacity: 0.7;
-        margin-top: 40px;
+        margin-top: clamp(20px, 4vw, 40px);
+        word-break: break-all;
+        padding: 0 8px;
     }
 
     .signalr-indicator {
@@ -78,6 +90,24 @@
         border-radius: 5px;
         font-size: 14px;
         background-color: rgba(0, 0, 0, 0.3);
+    }
+
+    .btn-klaar {
+        font-size: clamp(18px, 5vw, 28px);
+        padding: clamp(10px, 2.5vw, 16px) clamp(24px, 8vw, 48px);
+        margin-top: clamp(20px, 5vw, 40px);
+        border-radius: 12px;
+        background-color: white;
+        color: #28a745;
+        border: none;
+        font-weight: bold;
+        cursor: pointer;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .btn-klaar:hover, .btn-klaar:active {
+        background-color: #f0f0f0;
     }
 </style>
 
@@ -101,6 +131,19 @@ else if (!string.IsNullOrEmpty(_errorMessage))
         }
     </div>
 }
+else if (_isTestComplete)
+{
+    <div class="fullscreen-status status-complete">
+        <div class="status-icon">🏁</div>
+        <div class="status-title">Klaar!</div>
+        <div class="status-message">Je kunt weer met het normale netwerk verbinden</div>
+        <div class="status-details">
+            <div>Naam: @_studentName</div>
+            <div>Toets: @_testName</div>
+        </div>
+        <div class="status-mac">@_macAddress</div>
+    </div>
+}
 else if (_isConnected)
 {
     <div class="fullscreen-status status-connected">
@@ -111,6 +154,7 @@ else if (_isConnected)
             <div>Naam: @_studentName</div>
             <div>Toets: @_testName</div>
         </div>
+        <button class="btn-klaar" @onclick="KlaarClickedAsync">Ik ben klaar</button>
         <div class="status-mac">@_macAddress</div>
         @if (_isSignalRConnected)
         {
@@ -155,6 +199,7 @@ else
     private string? _macAddress;
     private StudentConnectionStatusDto? _status;
     private bool _isConnected;
+    private bool _isTestComplete;
     private bool _isLoading = true;
     private string? _errorMessage;
     private string? _studentName;
@@ -232,6 +277,7 @@ else
 
         _status = await MyScreenService.GetStudentConnectionStatusAsync(_macAddress);
         _isConnected = _status.IsConnected;
+        _isTestComplete = _status.IsTestComplete;
         _studentName = _status.Name;
         _testName = _status.TestName;
     }
@@ -336,6 +382,11 @@ else
             {
                 _isConnected = false;
             }
+            else if (payload.Status == "testcomplete")
+            {
+                _isConnected = false;
+                _isTestComplete = true;
+            }
 
             // Trigger UI update
             await InvokeAsync(StateHasChanged);
@@ -344,6 +395,16 @@ else
         {
             Console.WriteLine($"Fout bij verwerken status update: {ex.Message}");
         }
+    }
+
+    private async Task KlaarClickedAsync()
+    {
+        if (string.IsNullOrEmpty(_macAddress)) return;
+        await MyScreenService.MarkTestCompleteAsync(_macAddress);
+        _isConnected = false;
+        _isTestComplete = true;
+        NavState.SetCanRegister(true);
+        await InvokeAsync(StateHasChanged);
     }
 
     /// <summary>

@@ -8,6 +8,9 @@
 @inject ITeacherAuthService TeacherAuth
 @inject PersistentComponentState AppState
 @inject NavigationManager Nav
+@inject IHttpContextAccessor HttpContextAccessor
+@inject StudentWifiMonitoring.Web.Services.IMacResolver MacResolver
+@inject StudentWifiMonitoring.Web.Services.Interfaces.IMyScreenService MyScreenService
 @implements IAsyncDisposable
 
 <PageTitle>Docent Dashboard</PageTitle>
@@ -101,7 +104,11 @@ else
                                 {
                                     <tr class="@(s.IsOnline ? "table-success" : "")" style="cursor:pointer" @onclick="() => OpenStudentDetail(s)" title="Klik voor activiteitenlog">
                                         <td>
-                                            @if (s.IsOnline)
+                                            @if (s.IsTestComplete)
+                                            {
+                                                <span class="badge bg-success">✅ Klaar</span>
+                                            }
+                                            else if (s.IsOnline)
                                             {
                                                 <span class="badge bg-success">🟢 Verbonden</span>
                                             }
@@ -155,15 +162,30 @@ else
                             <thead class="table-light">
                                 <tr>
                                     <th>Tijdstip</th>
+                                    <th>Naam</th>
                                     <th>Gebeurtenis</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach (StudentActivityDto a in studentActivity)
                                 {
-                                    <tr class="@(a.EventType == EventType.Disconnected ? "table-warning" : "table-success")">
+                                    <tr class="@(a.EventType == EventType.Disconnected ? "table-warning" : a.EventType == EventType.TestCompleted ? "table-info" : "table-success")">
                                         <td>@a.Timestamp.ToLocalTime().ToString("HH:mm:ss")</td>
-                                        <td>@(a.EventType == EventType.Disconnected ? "🔴 Verbinding verbroken" : "🟢 Verbonden")</td>
+                                        <td><strong>@a.StudentName</strong></td>
+                                        <td>
+                                            @if (a.EventType == EventType.Disconnected)
+                                            {
+                                                <span>🔴 Verbinding verbroken</span>
+                                            }
+                                            else if (a.EventType == EventType.TestCompleted)
+                                            {
+                                                <span>🏁 Ik ben klaar</span>
+                                            }
+                                            else
+                                            {
+                                                <span>🟢 Verbonden</span>
+                                            }
+                                        </td>
                                     </tr>
                                 }
                             </tbody>
@@ -209,6 +231,18 @@ else
 
         if (!isTeacher)
         {
+            var ip = HttpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
+            if (!string.IsNullOrEmpty(ip))
+            {
+                var mac = MacResolver.GetMacForIp(ip);
+                if (!string.IsNullOrEmpty(mac))
+                {
+                    var status = await MyScreenService.GetStudentConnectionStatusAsync(mac);
+                    Nav.NavigateTo(status.IsConnected && !status.IsTestComplete ? "/myscreen" : "/register");
+                    return;
+                }
+            }
+            Nav.NavigateTo("/register");
             return;
         }
 
@@ -306,20 +340,31 @@ else
 
                 if (existingStudent != null)
                 {
-                    bool wasOnline = existingStudent.IsOnline;
-                    existingStudent.IsOnline = payload.Status == "connected";
+                    if (payload.Status == "testcomplete")
+                    {
+                        existingStudent.IsOnline = false;
+                        existingStudent.IsTestComplete = true;
+                    }
+                    else
+                    {
+                        if (payload.Status == "connected")
+                            existingStudent.IsTestComplete = false;
 
-                    if (wasOnline && !existingStudent.IsOnline)
-                        existingStudent.DisconnectionCount++;
+                        bool wasOnline = existingStudent.IsOnline;
+                        existingStudent.IsOnline = payload.Status == "connected";
 
-                    if (!wasOnline && existingStudent.IsOnline)
-                        existingStudent.LastConnectedAt = DateTime.UtcNow;
+                        if (wasOnline && !existingStudent.IsOnline)
+                            existingStudent.DisconnectionCount++;
 
-                    if (!string.IsNullOrEmpty(payload.Name) && existingStudent.Name != payload.Name)
-                        existingStudent.Name = payload.Name;
+                        if (!wasOnline && existingStudent.IsOnline)
+                            existingStudent.LastConnectedAt = DateTime.UtcNow;
 
-                    if (!string.IsNullOrEmpty(payload.TestName) && existingStudent.TestName != payload.TestName)
-                        existingStudent.TestName = payload.TestName;
+                        if (!string.IsNullOrEmpty(payload.Name) && existingStudent.Name != payload.Name)
+                            existingStudent.Name = payload.Name;
+
+                        if (!string.IsNullOrEmpty(payload.TestName) && existingStudent.TestName != payload.TestName)
+                            existingStudent.TestName = payload.TestName;
+                    }
                 }
                 else if (!string.IsNullOrEmpty(payload.Name) && selectedTestId.HasValue)
                 {

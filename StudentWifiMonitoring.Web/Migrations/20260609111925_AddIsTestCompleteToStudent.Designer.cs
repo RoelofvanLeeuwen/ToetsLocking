@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using StudentWifiMonitoring.Web.Data;
 
@@ -10,9 +11,11 @@ using StudentWifiMonitoring.Web.Data;
 namespace StudentWifiMonitoring.Web.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260609111925_AddIsTestCompleteToStudent")]
+    partial class AddIsTestCompleteToStudent
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.9");
@@ -50,10 +53,6 @@ namespace StudentWifiMonitoring.Web.Migrations
 
                     b.Property<int>("StudentId")
                         .HasColumnType("INTEGER");
-
-                    b.Property<string>("StudentName")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
 
                     b.Property<int>("TestSessionId")
                         .HasColumnType("INTEGER");

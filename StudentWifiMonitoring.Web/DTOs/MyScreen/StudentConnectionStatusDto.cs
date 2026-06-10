@@ -25,4 +25,9 @@ public class StudentConnectionStatusDto
     /// Geeft aan of de student momenteel een actieve verbinding heeft.
     /// </summary>
     public bool IsConnected { get; set; }
+
+    /// <summary>
+    /// Geeft aan of de student op "Ik ben klaar" heeft geklikt.
+    /// </summary>
+    public bool IsTestComplete { get; set; }
 }

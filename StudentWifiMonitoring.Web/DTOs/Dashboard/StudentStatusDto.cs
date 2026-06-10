@@ -34,4 +34,9 @@ public class StudentStatusDto
     /// Tijdstip van de meest recente verbinding (voor sortering).
     /// </summary>
     public DateTime? LastConnectedAt { get; set; }
+
+    /// <summary>
+    /// Geeft aan of de student op "Ik ben klaar" heeft geklikt.
+    /// </summary>
+    public bool IsTestComplete { get; set; }
 }

@@ -1,4 +1,4 @@
 ﻿namespace StudentWifiMonitoring.Web.Domain
 {
-    public enum EventType { Connected, Disconnected }
+    public enum EventType { Connected, Disconnected, TestCompleted }
 }

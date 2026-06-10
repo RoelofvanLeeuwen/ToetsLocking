@@ -142,6 +142,11 @@ public class MonitoringService : BackgroundService
 
         foreach (var student in onlineStudents)
         {
+            if (student.IsTestComplete) continue;
+
+            // Sla over als de student niet voor de huidige toets is geregistreerd
+            if (student.TestName != activeSession.Name) continue;
+
             // Sla over als de student al een open verbinding heeft
             bool hasOpenConnection = await context.Connections
                 .AnyAsync(c => c.StudentId == student.Id && c.DisconnectedAt == null, cancellationToken);
@@ -163,7 +168,8 @@ public class MonitoringService : BackgroundService
                 StudentId = student.Id,
                 TestSessionId = activeSession.Id,
                 EventType = EventType.Connected,
-                Timestamp = now
+                Timestamp = now,
+                StudentName = student.Name
             });
 
             await context.SaveChangesAsync(cancellationToken);
@@ -192,7 +198,23 @@ public class MonitoringService : BackgroundService
             return;
         }
 
+        // Sla over als de student niet voor de huidige toets is geregistreerd
+        if (student.TestName != activeSession.Name)
+        {
+            _logger.LogInformation("MAC {MacAddress} bekend als '{Name}' maar niet geregistreerd voor huidige toets '{TestName}', overgeslagen",
+                mac, student.Name, activeSession.Name);
+            return;
+        }
+
         var now = DateTime.UtcNow;
+
+        if (student.IsTestComplete)
+        {
+            // Student heeft eerder 'Ik ben klaar' geklikt maar verbindt opnieuw:
+            // reset de vlag zodat monitoring hervat en het dashboard de ✅ verwijdert.
+            student.IsTestComplete = false;
+            _logger.LogInformation("Student {Name} ({MacAddress}) verbindt opnieuw na 'Ik ben klaar', monitoring hervat", student.Name, mac);
+        }
 
         // Sluit eventuele stale open verbindingen van vorige sessies voordat we een nieuwe aanmaken.
         // HandleConnectAsync wordt aangeroepen als een MAC opnieuw verschijnt na een periode offline —
@@ -217,7 +239,8 @@ public class MonitoringService : BackgroundService
             StudentId = student.Id,
             TestSessionId = activeSession.Id,
             EventType = EventType.Connected,
-            Timestamp = now
+            Timestamp = now,
+            StudentName = student.Name
         };
         context.Events.Add(eventLog);
 
@@ -250,6 +273,14 @@ public class MonitoringService : BackgroundService
             return;
         }
 
+        // Sla over als de student niet voor de huidige toets is geregistreerd
+        if (student.TestName != activeSession.Name)
+        {
+            _logger.LogInformation("MAC {MacAddress} bekend als '{Name}' maar niet geregistreerd voor huidige toets '{TestName}', disconnectie genegeerd",
+                mac, student.Name, activeSession.Name);
+            return;
+        }
+
         var now = DateTime.UtcNow;
 
         // Sluit alle open verbindingen voor deze student — er zou er normaal maar één zijn,
@@ -266,7 +297,8 @@ public class MonitoringService : BackgroundService
             StudentId = student.Id,
             TestSessionId = activeSession.Id,
             EventType = EventType.Disconnected,
-            Timestamp = now
+            Timestamp = now,
+            StudentName = student.Name
         };
         context.Events.Add(eventLog);
 

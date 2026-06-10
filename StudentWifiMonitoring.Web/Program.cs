@@ -28,6 +28,7 @@ public class Program
         builder.Services.AddScoped<IStudentRegistrationService, StudentRegistrationService>();
         builder.Services.AddScoped<IStatusService, StatusService>();
         builder.Services.AddScoped<IMyScreenService, MyScreenService>();
+        builder.Services.AddScoped<StudentNavStateService>();
         builder.Services.AddScoped<IExportService, ExportService>();
         builder.Services.AddScoped<IDevStationsService, DevStationsService>();
         builder.Services.AddScoped<ITeacherAuthService, TeacherAuthService>();
