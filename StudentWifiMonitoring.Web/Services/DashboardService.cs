@@ -59,17 +59,32 @@ public class DashboardService : IDashboardService
                 return new List<StudentStatusDto>();
             }
 
-            // Bepaal welke studenten daadwerkelijk deelnamen via de EventLog.
-            // Dit is betrouwbaarder dan Student.TestName, dat overschreven wordt bij latere registraties.
+            // Bepaal deelnemende studenten via EventLog — betrouwbaarder dan Student.TestName
+            // die overschreven wordt bij elke nieuwe registratie.
             var participatingStudentIds = _db.Events
                 .Where(e => e.TestSessionId == testSessionId.Value)
                 .Select(e => e.StudentId)
                 .Distinct()
                 .ToHashSet();
 
+            // Haal Connected-events op inclusief de opgeslagen naam op dat moment.
+            // Student.Name is veranderlijk; EventLog.StudentName bevat de naam ten tijde van het event.
+            var connectedEventData = _db.Events
+                .Where(e => e.EventType == EventType.Connected && e.TestSessionId == testSessionId.Value)
+                .Select(e => new { e.StudentId, e.Timestamp, e.StudentName })
+                .ToList()
+                .GroupBy(e => e.StudentId)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(e => e.Timestamp).First());
+
+            lastConnectionEvents = connectedEventData
+                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Timestamp);
+
+            // Verbindingen die open zijn én binnen de tijdspanne van deze sessie vallen.
+            // ConnectedAt <= test.EndTime sluit verbindingen uit van latere toetsen.
             onlineMacs = _db.Connections
                 .Where(c => c.DisconnectedAt == null
                             && c.ConnectedAt >= test.StartTime
+                            && c.ConnectedAt <= test.EndTime
                             && participatingStudentIds.Contains(c.StudentId))
                 .Select(c => c.Student!.MacAddress)
                 .ToHashSet();
@@ -80,25 +95,30 @@ public class DashboardService : IDashboardService
                 .Select(g => new { StudentId = g.Key, Count = g.Count() })
                 .ToDictionary(x => x.StudentId, x => x.Count);
 
-            lastConnectionEvents = _db.Events
-                .Where(e => e.EventType == EventType.Connected && e.TestSessionId == testSessionId.Value)
-                .GroupBy(e => e.StudentId)
-                .Select(g => new { StudentId = g.Key, LastConnectedAt = g.Max(e => e.Timestamp) })
-                .ToDictionary(x => x.StudentId, x => x.LastConnectedAt);
+            // Studenten die 'Ik ben klaar' hebben geklikt tijdens deze sessie.
+            var completedStudentIds = _db.Events
+                .Where(e => e.EventType == EventType.TestCompleted && e.TestSessionId == testSessionId.Value)
+                .Select(e => e.StudentId)
+                .ToHashSet();
 
-            return _db.Students
+            var students = _db.Students
                 .Where(s => participatingStudentIds.Contains(s.Id))
-                .Select(s => new StudentStatusDto
-                {
-                    MacAddress = s.MacAddress,
-                    Name = s.Name,
-                    TestName = s.TestName,
-                    IsOnline = onlineMacs.Contains(s.MacAddress),
-                    DisconnectionCount = disconnectionCounts.GetValueOrDefault(s.Id, 0),
-                    LastConnectedAt = lastConnectionEvents.ContainsKey(s.Id) ? lastConnectionEvents[s.Id] : (DateTime?)null,
-                    IsTestComplete = s.IsTestComplete
-                })
+                .Select(s => new { s.Id, s.MacAddress, s.Name })
                 .ToList();
+
+            return students.Select(s => new StudentStatusDto
+            {
+                MacAddress = s.MacAddress,
+                // Gebruik de historische naam uit EventLog; val terug op huidige naam voor oude events zonder StudentName.
+                Name = connectedEventData.TryGetValue(s.Id, out var ev) && !string.IsNullOrEmpty(ev.StudentName)
+                    ? ev.StudentName
+                    : s.Name,
+                TestName = test.Name,
+                IsOnline = onlineMacs.Contains(s.MacAddress),
+                DisconnectionCount = disconnectionCounts.GetValueOrDefault(s.Id, 0),
+                LastConnectedAt = lastConnectionEvents.ContainsKey(s.Id) ? lastConnectionEvents[s.Id] : (DateTime?)null,
+                IsTestComplete = completedStudentIds.Contains(s.Id)
+            }).ToList();
         }
         else
         {
