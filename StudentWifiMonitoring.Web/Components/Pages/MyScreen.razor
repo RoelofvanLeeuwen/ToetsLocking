@@ -387,6 +387,11 @@ else
                 _isConnected = false;
                 _isTestComplete = true;
             }
+            else if (payload.Status == "needs_registration")
+            {
+                Nav.NavigateTo("/register");
+                return;
+            }
 
             // Trigger UI update
             await InvokeAsync(StateHasChanged);

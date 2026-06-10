@@ -208,12 +208,30 @@ public class MonitoringService : BackgroundService
 
         var now = DateTime.UtcNow;
 
-        if (student.IsTestComplete)
+        // Detecteer herverbinding: student had eerder een Disconnected event in deze sessie,
+        // of heeft 'Ik ben klaar' geklikt. In beide gevallen moet de student opnieuw registreren.
+        bool hadDisconnected = await context.Events
+            .AnyAsync(e => e.StudentId == student.Id
+                           && e.TestSessionId == activeSession.Id
+                           && e.EventType == EventType.Disconnected, cancellationToken);
+
+        if (hadDisconnected || student.IsTestComplete)
         {
-            // Student heeft eerder 'Ik ben klaar' geklikt maar verbindt opnieuw:
-            // reset de vlag zodat monitoring hervat en het dashboard de ✅ verwijdert.
+            student.TestName = string.Empty;
             student.IsTestComplete = false;
-            _logger.LogInformation("Student {Name} ({MacAddress}) verbindt opnieuw na 'Ik ben klaar', monitoring hervat", student.Name, mac);
+            await context.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("Student {Name} ({MacAddress}) verbindt opnieuw - moet opnieuw registreren",
+                student.Name, mac);
+
+            await _hubContext.Clients.All.SendAsync("status", new
+            {
+                mac,
+                status = "needs_registration",
+                name = student.Name,
+                testName = activeSession.Name
+            }, cancellationToken);
+            return;
         }
 
         // Sluit eventuele stale open verbindingen van vorige sessies voordat we een nieuwe aanmaken.
