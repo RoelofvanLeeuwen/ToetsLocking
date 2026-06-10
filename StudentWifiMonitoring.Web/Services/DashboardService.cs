@@ -95,10 +95,15 @@ public class DashboardService : IDashboardService
                 .Select(g => new { StudentId = g.Key, Count = g.Count() })
                 .ToDictionary(x => x.StudentId, x => x.Count);
 
-            // Studenten die 'Ik ben klaar' hebben geklikt tijdens deze sessie.
+            // Studenten die als laatste relevante event 'TestCompleted' hebben (niet gevolgd door een nieuw 'Connected').
+            // Zo worden studenten die na 'Ik ben klaar' opnieuw aanmelden correct als Verbonden getoond.
             var completedStudentIds = _db.Events
-                .Where(e => e.EventType == EventType.TestCompleted && e.TestSessionId == testSessionId.Value)
-                .Select(e => e.StudentId)
+                .Where(e => e.TestSessionId == testSessionId.Value &&
+                           (e.EventType == EventType.TestCompleted || e.EventType == EventType.Connected))
+                .GroupBy(e => e.StudentId)
+                .AsEnumerable()
+                .Where(g => g.OrderByDescending(e => e.Timestamp).First().EventType == EventType.TestCompleted)
+                .Select(g => g.Key)
                 .ToHashSet();
 
             var students = _db.Students
