@@ -9,14 +9,6 @@ namespace StudentWifiMonitoring.Web.Services.Interfaces;
 public interface IExportService
 {
     /// <summary>
-    /// Genereert een CSV-export van alle events in memory.
-    /// De inhoud wordt teruggegeven in de DTO zodat de browser de download direct kan starten.
-    /// Er worden geen bestanden op de server opgeslagen.
-    /// </summary>
-    /// <returns>Resultaat met succes-indicatie, bestandsnaam, CSV-inhoud of foutmelding.</returns>
-    Task<ExportResultDto> ExportAllAsync();
-
-    /// <summary>
     /// Haalt alle toetssessies op als DTO's voor gebruik in de exportpagina, gesorteerd op starttijd (nieuwste eerst).
     /// </summary>
     /// <returns>Lijst van toetssessie DTO's.</returns>
