@@ -273,6 +273,14 @@ public class MonitoringService : BackgroundService
             return;
         }
 
+        // Sla over als de student niet voor de huidige toets is geregistreerd
+        if (student.TestName != activeSession.Name)
+        {
+            _logger.LogInformation("MAC {MacAddress} bekend als '{Name}' maar niet geregistreerd voor huidige toets '{TestName}', disconnectie genegeerd",
+                mac, student.Name, activeSession.Name);
+            return;
+        }
+
         var now = DateTime.UtcNow;
 
         // Sluit alle open verbindingen voor deze student — er zou er normaal maar één zijn,
