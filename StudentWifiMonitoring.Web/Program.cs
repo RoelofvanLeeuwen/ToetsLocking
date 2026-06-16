@@ -4,6 +4,7 @@ using StudentWifiMonitoring.Web.Data;
 using StudentWifiMonitoring.Web.Hubs;
 using StudentWifiMonitoring.Web.Services;
 using StudentWifiMonitoring.Web.Services.Interfaces;
+using StudentWifiMonitoring.Web.Services.Wifi;
 
 // TeacherAuthService.CookieName en CookieValue zijn internal const en worden gebruikt
 // in de login/logout endpoints hieronder.
@@ -50,6 +51,12 @@ builder.Services.AddScoped<IMyScreenService, MyScreenService>();
             builder.Services.AddSingleton<IStationProvider, LinuxIwStationProvider>();
         }
         
+        // IWifiManager registratie - RUNTIME bepaald
+        if (OperatingSystem.IsWindows())
+            builder.Services.AddSingleton<IWifiManager, MockWifiManager>();
+        else
+            builder.Services.AddSingleton<IWifiManager, LinuxWifiManager>();
+
         // IMacResolver registratie - compile-time bepaald (blijft #if)
 #if WINDOWS
         // Registreer de echte resolver
