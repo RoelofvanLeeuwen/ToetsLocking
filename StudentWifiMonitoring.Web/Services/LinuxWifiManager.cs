@@ -7,8 +7,8 @@ namespace StudentWifiMonitoring.Web.Services;
 
 /// <summary>
 /// Linux-implementatie voor WiFi-beheer via nmcli op de Raspberry Pi.
-/// Vereist: sudo nmcli zonder wachtwoord voor de app-user (zie /etc/sudoers.d/toetslocker-nmcli).
-/// </summary>
+/// De Docker-container draait als root — sudo is niet nodig.
+///</summary>
 public class LinuxWifiManager : IWifiManager
 {
     private readonly string _iface;
@@ -28,7 +28,7 @@ public class LinuxWifiManager : IWifiManager
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(TimeSpan.FromSeconds(10));
 
-        var output = await RunAsync("sudo", ["nmcli", "-t", "-f", "SSID,SIGNAL,SECURITY", "device", "wifi", "list", "--rescan", "yes"], cts.Token);
+        var output = await RunAsync("nmcli", ["-t", "-f", "SSID,SIGNAL,SECURITY", "device", "wifi", "list", "--rescan", "yes"], cts.Token);
 
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var networks = new List<WifiNetwork>();
@@ -57,7 +57,7 @@ public class LinuxWifiManager : IWifiManager
     {
         _logger.LogInformation("Verbinden met netwerk {Ssid}", ssid);
 
-        var args = new List<string> { "nmcli", "device", "wifi", "connect", ssid };
+        var args = new List<string> { "device", "wifi", "connect", ssid };
         if (!string.IsNullOrEmpty(password))
         {
             args.Add("password");
@@ -69,7 +69,7 @@ public class LinuxWifiManager : IWifiManager
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(TimeSpan.FromSeconds(30));
 
-            var (stdout, stderr) = await RunWithStderrAsync("sudo", [.. args], cts.Token);
+            var (stdout, stderr) = await RunWithStderrAsync("nmcli", [.. args], cts.Token);
 
             if (stderr.Contains("Secrets were required", StringComparison.OrdinalIgnoreCase) ||
                 stderr.Contains("802-11-wireless-security.psk", StringComparison.OrdinalIgnoreCase))
@@ -102,7 +102,7 @@ public class LinuxWifiManager : IWifiManager
     {
         try
         {
-            await RunAsync("sudo", ["nmcli", "device", "disconnect", _iface], ct);
+            await RunAsync("nmcli", ["device", "disconnect", _iface], ct);
             return true;
         }
         catch (Exception ex)
@@ -114,7 +114,7 @@ public class LinuxWifiManager : IWifiManager
 
     public async Task<WifiStatus> GetStatusAsync(CancellationToken ct = default)
     {
-        var deviceOutput = await RunAsync("sudo", ["nmcli", "-t", "-f", "DEVICE,STATE,CONNECTION", "device", "status"], ct);
+        var deviceOutput = await RunAsync("nmcli", ["-t", "-f", "DEVICE,STATE,CONNECTION", "device", "status"], ct);
 
         string? connectedSsid = null;
         var state = WifiState.Disconnected;
