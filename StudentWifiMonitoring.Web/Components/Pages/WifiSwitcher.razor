@@ -1,0 +1,333 @@
+@page "/wifi"
+@rendermode InteractiveServer
+@using StudentWifiMonitoring.Web.Services.Interfaces
+@using StudentWifiMonitoring.Web.Services.Wifi
+@inject IWifiManager WifiManager
+@inject ITeacherAuthService TeacherAuth
+@inject PersistentComponentState AppState
+@inject NavigationManager Nav
+@implements IAsyncDisposable
+
+<PageTitle>Wifi-netwerk — Toetslocker</PageTitle>
+
+@if (!_isTeacher)
+{
+    <div class="tl-empty">
+        <div class="ic"><TLIcon Name="lock" Size="32" /></div>
+        <h3>Geen toegang</h3>
+        <p>Deze pagina is alleen beschikbaar voor docenten.</p>
+    </div>
+}
+else
+{
+    <div class="tl-ph">
+        <h1>Wifi-netwerk</h1>
+        <p>Selecteer het netwerk waarmee de Pi verbinding maakt.</p>
+    </div>
+
+    @* Huidige verbindingsstatus *@
+    <div class="tl-panel wifi-status-panel">
+        <div class="tl-panel-head">
+            <span class="tl-panel-title">Huidige verbinding</span>
+            @if (_status is not null)
+            {
+                <button class="tl-btn-ghost" @onclick="RefreshStatus" disabled="@(_isScanning || _isConnecting)">
+                    Vernieuwen
+                </button>
+            }
+        </div>
+        <div class="wifi-status-body">
+            @if (_status is null)
+            {
+                <p>Laden…</p>
+            }
+            else if (_status.State == WifiState.Connected)
+            {
+                <span class="tl-spill verbonden">Verbonden</span>
+                <span class="wifi-ssid">@_status.ConnectedSsid</span>
+                @if (_status.IpAddress is not null)
+                {
+                    <span class="wifi-ip">@_status.IpAddress</span>
+                }
+                <button class="tl-btn-ghost wifi-disconnect-btn" @onclick="DisconnectAsync"
+                        disabled="@(_isScanning || _isConnecting)">
+                    Verbinding verbreken
+                </button>
+            }
+            else if (_status.State == WifiState.Connecting)
+            {
+                <span class="tl-spill">Verbinden…</span>
+            }
+            else
+            {
+                <span class="tl-spill niet">Niet verbonden</span>
+            }
+        </div>
+    </div>
+
+    @* Waarschuwingsbanner — altijd zichtbaar *@
+    <div class="tl-confirm-warn wifi-warn">
+        <TLIcon Name="alert" Size="16" />
+        <span>Wisselen van netwerk verbreekt tijdelijk de verbinding met de browser. Herlaad de pagina na het verbinden.</span>
+    </div>
+
+    @* Netwerken *@
+    <div class="tl-panel">
+        <div class="tl-panel-head">
+            <span class="tl-panel-title">Beschikbare netwerken</span>
+            <button class="tl-btn-brand" @onclick="ScanAsync" disabled="@(_isScanning || _isConnecting)">
+                @if (_isScanning)
+                {
+                    <span>Scannen…</span>
+                }
+                else
+                {
+                    <TLIcon Name="wifi" Size="16" />
+                    <span>Scannen</span>
+                }
+            </button>
+        </div>
+
+        @if (_networks is null)
+        {
+            <div class="tl-empty">
+                <p>Druk op 'Scannen' om beschikbare netwerken te zoeken.</p>
+            </div>
+        }
+        else if (!_networks.Any())
+        {
+            <div class="tl-empty">
+                <p>Geen netwerken gevonden.</p>
+            </div>
+        }
+        else
+        {
+            <ul class="wifi-list">
+                @foreach (var net in _networks)
+                {
+                    <li class="wifi-item @(net.IsConnected ? "is-connected" : "")">
+                        <div class="wifi-item-left">
+                            <div class="tl-wifi-bars">
+                                @{ var bars = SignalBars(net.SignalStrength); }
+                                <span class="@(bars >= 1 ? "on" : "")"></span>
+                                <span class="@(bars >= 2 ? "on" : "")"></span>
+                                <span class="@(bars >= 3 ? "on" : "")"></span>
+                                <span class="@(bars >= 4 ? "on" : "")"></span>
+                            </div>
+                            <span class="wifi-item-ssid">@net.Ssid</span>
+                            @if (net.SecurityType != "Open")
+                            {
+                                <span class="tl-spill">@net.SecurityType</span>
+                            }
+                            @if (net.IsConnected)
+                            {
+                                <span class="tl-spill verbonden">Verbonden</span>
+                            }
+                        </div>
+                        <button class="tl-btn-ghost" @onclick="() => OpenModal(net)"
+                                disabled="@(_isScanning || _isConnecting || net.IsConnected)">
+                            Selecteren
+                        </button>
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+}
+
+@* Verbindingsmodal *@
+@if (_modalNetwork is not null)
+{
+    <div class="tl-modal-scrim" @onclick="CloseModal">
+        <div class="tl-modal" @onclick:stopPropagation>
+            <div class="tl-modal-head">
+                <span>Verbinden met @_modalNetwork.Ssid</span>
+                <button class="tl-modal-close" @onclick="CloseModal">
+                    <TLIcon Name="close" Size="18" />
+                </button>
+            </div>
+            <div class="tl-modal-body">
+                @if (_modalNetwork.SecurityType != "Open")
+                {
+                    <label>Wachtwoord</label>
+                    <input type="password" class="tl-input" placeholder="WiFi-wachtwoord"
+                           @bind="_modalPassword" @bind:event="oninput"
+                           disabled="@_isConnecting" />
+                }
+                @if (_connectError is not null)
+                {
+                    <div class="tl-form-error">@_connectError</div>
+                }
+            </div>
+            <div class="tl-modal-foot">
+                <button class="tl-btn-ghost" @onclick="CloseModal" disabled="@_isConnecting">Annuleren</button>
+                <button class="tl-btn-brand" @onclick="ConnectToModalNetworkAsync" disabled="@_isConnecting">
+                    @(_isConnecting ? "Verbinden…" : "Verbinden")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _isTeacher;
+    private WifiStatus? _status;
+    private List<WifiNetwork>? _networks;
+    private bool _isScanning;
+    private bool _isConnecting;
+
+    private WifiNetwork? _modalNetwork;
+    private string _modalPassword = string.Empty;
+    private string? _connectError;
+
+    private PersistingComponentStateSubscription _sub;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isTeacher = TeacherAuth.IsTeacher();
+        if (!_isTeacher) return;
+
+        _sub = AppState.RegisterOnPersisting(PersistState);
+
+        if (AppState.TryTakeFromJson<WifiStatus>("wifi-status", out var saved) && saved is not null)
+            _status = saved;
+        else
+            _status = await WifiManager.GetStatusAsync();
+    }
+
+    private Task PersistState()
+    {
+        if (_status is not null)
+            AppState.PersistAsJson("wifi-status", _status);
+        return Task.CompletedTask;
+    }
+
+    private async Task RefreshStatus()
+    {
+        _status = await WifiManager.GetStatusAsync();
+        StateHasChanged();
+    }
+
+    private async Task ScanAsync()
+    {
+        _isScanning = true;
+        StateHasChanged();
+        try
+        {
+            var results = await WifiManager.ScanAsync();
+            _networks = results.ToList();
+            _status = await WifiManager.GetStatusAsync();
+        }
+        finally
+        {
+            _isScanning = false;
+            StateHasChanged();
+        }
+    }
+
+    private void OpenModal(WifiNetwork network)
+    {
+        _modalNetwork = network;
+        _modalPassword = string.Empty;
+        _connectError = null;
+    }
+
+    private void CloseModal()
+    {
+        _modalNetwork = null;
+        _modalPassword = string.Empty;
+        _connectError = null;
+    }
+
+    private async Task ConnectToModalNetworkAsync()
+    {
+        if (_modalNetwork is null) return;
+
+        _isConnecting = true;
+        _connectError = null;
+        StateHasChanged();
+
+        var ssid = _modalNetwork.Ssid;
+        var pwd = _modalPassword;
+
+        try
+        {
+            var result = await WifiManager.ConnectAsync(ssid, pwd);
+
+            _modalPassword = string.Empty; // wis wachtwoord direct
+
+            switch (result.Outcome)
+            {
+                case ConnectOutcome.Success:
+                    _status = await WifiManager.GetStatusAsync();
+                    if (_networks is not null)
+                    {
+                        _networks = _networks
+                            .Select(n => n with { IsConnected = n.Ssid == ssid })
+                            .ToList();
+                    }
+                    CloseModal();
+                    break;
+
+                case ConnectOutcome.AuthFailed:
+                    _connectError = "Verificatie mislukt — controleer het wachtwoord.";
+                    break;
+
+                case ConnectOutcome.NotFound:
+                    _connectError = $"Netwerk '{ssid}' niet gevonden. Scan opnieuw.";
+                    CloseModal();
+                    break;
+
+                case ConnectOutcome.PermissionDenied:
+                    _connectError = "Geen rechten om nmcli uit te voeren. Controleer de sudoers-configuratie.";
+                    break;
+
+                case ConnectOutcome.Timeout:
+                    _connectError = "Verbinding duurde te lang. Probeer het opnieuw.";
+                    break;
+
+                default:
+                    _connectError = result.Message ?? "Onbekende fout.";
+                    break;
+            }
+        }
+        finally
+        {
+            pwd = string.Empty;
+            _isConnecting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DisconnectAsync()
+    {
+        _isConnecting = true;
+        StateHasChanged();
+        try
+        {
+            await WifiManager.DisconnectAsync();
+            _status = await WifiManager.GetStatusAsync();
+            if (_networks is not null)
+                _networks = _networks.Select(n => n with { IsConnected = false }).ToList();
+        }
+        finally
+        {
+            _isConnecting = false;
+            StateHasChanged();
+        }
+    }
+
+    private static int SignalBars(int strength) => strength switch
+    {
+        >= 75 => 4,
+        >= 50 => 3,
+        >= 25 => 2,
+        _     => 1,
+    };
+
+    public ValueTask DisposeAsync()
+    {
+        _sub.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}
