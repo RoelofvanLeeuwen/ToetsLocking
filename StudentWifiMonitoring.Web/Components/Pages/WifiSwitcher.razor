@@ -4,9 +4,7 @@
 @using StudentWifiMonitoring.Web.Services.Wifi
 @inject IWifiManager WifiManager
 @inject ITeacherAuthService TeacherAuth
-@inject PersistentComponentState AppState
 @inject NavigationManager Nav
-@implements IAsyncDisposable
 
 <PageTitle>Wifi-netwerk — Toetslocker</PageTitle>
 
@@ -180,26 +178,12 @@ else
     private string _modalPassword = string.Empty;
     private string? _connectError;
 
-    private PersistingComponentStateSubscription _sub;
-
     protected override async Task OnInitializedAsync()
     {
         _isTeacher = TeacherAuth.IsTeacher();
         if (!_isTeacher) return;
 
-        _sub = AppState.RegisterOnPersisting(PersistState);
-
-        if (AppState.TryTakeFromJson<WifiStatus>("wifi-status", out var saved) && saved is not null)
-            _status = saved;
-        else
-            _status = await WifiManager.GetStatusAsync();
-    }
-
-    private Task PersistState()
-    {
-        if (_status is not null)
-            AppState.PersistAsJson("wifi-status", _status);
-        return Task.CompletedTask;
+        _status = await WifiManager.GetStatusAsync();
     }
 
     private async Task RefreshStatus()
@@ -325,9 +309,4 @@ else
         _     => 1,
     };
 
-    public ValueTask DisposeAsync()
-    {
-        _sub.Dispose();
-        return ValueTask.CompletedTask;
-    }
 }
