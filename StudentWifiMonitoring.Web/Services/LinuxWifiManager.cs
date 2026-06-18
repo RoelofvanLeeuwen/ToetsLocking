@@ -19,7 +19,7 @@ public class LinuxWifiManager : IWifiManager
 
     public LinuxWifiManager(IConfiguration cfg, ILogger<LinuxWifiManager> logger)
     {
-        _iface = cfg["Monitoring:Interface"] ?? "wlan0";
+        _iface = cfg["Wifi:Interface"] ?? "wlan0";
         _logger = logger;
     }
 
@@ -28,7 +28,7 @@ public class LinuxWifiManager : IWifiManager
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(TimeSpan.FromSeconds(10));
 
-        var output = await RunAsync("nmcli", ["-t", "-f", "SSID,SIGNAL,SECURITY", "device", "wifi", "list", "--rescan", "yes"], cts.Token);
+        var output = await RunAsync("nmcli", ["-t", "-f", "SSID,SIGNAL,SECURITY,DEVICE", "device", "wifi", "list", "--rescan", "yes"], cts.Token);
 
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var networks = new List<WifiNetwork>();
@@ -38,13 +38,16 @@ public class LinuxWifiManager : IWifiManager
         foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
         {
             var parts = SplitColon.Split(line);
-            if (parts.Length < 2) continue;
+            if (parts.Length < 4) continue;
+
+            var device = parts[3].Trim();
+            if (!device.Equals(_iface, StringComparison.OrdinalIgnoreCase)) continue;
 
             var ssid = parts[0].Replace(@"\:", ":");
             if (string.IsNullOrWhiteSpace(ssid) || !seen.Add(ssid)) continue;
 
             int.TryParse(parts[1], out var signal);
-            var security = parts.Length >= 3 ? parts[2].Trim() : string.Empty;
+            var security = parts[2].Trim();
             var secType = string.IsNullOrWhiteSpace(security) || security == "--" ? "Open" : "WPA2";
 
             networks.Add(new WifiNetwork(ssid, signal, secType, ssid == status.ConnectedSsid));
@@ -57,7 +60,7 @@ public class LinuxWifiManager : IWifiManager
     {
         _logger.LogInformation("Verbinden met netwerk {Ssid}", ssid);
 
-        var args = new List<string> { "device", "wifi", "connect", ssid };
+        var args = new List<string> { "device", "wifi", "connect", ssid, "ifname", _iface };
         if (!string.IsNullOrEmpty(password))
         {
             args.Add("password");

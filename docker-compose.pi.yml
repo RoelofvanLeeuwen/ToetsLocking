@@ -39,6 +39,7 @@ services:
       # Netwerkinterface waarop studenten binnenkomen — pas aan indien anders
       - Monitoring__Interface=wlan1
       - Monitoring__PollSeconds=2
+      - Wifi__Interface=wlan0
 
       # Docent-wachtwoord — verplicht wijzigen vóór productiegebruik
       - Teacher__Password=1234
