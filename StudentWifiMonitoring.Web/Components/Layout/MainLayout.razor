@@ -18,11 +18,11 @@
             <NavMenu />
         </nav>
         <div class="tl-side-foot">
-            <div class="tl-side-user">
-                <div class="av tl-av-btn" @onclick="OpenPinModal" title="Pincode wijzigen">DO</div>
+            <div class="tl-side-user tl-av-btn" @onclick="OpenPinModal" title="Instellingen">
+                <div class="av">DO</div>
                 <div>
                     <div class="nm">Docent</div>
-                    <div class="rl">Beheerder</div>
+                    <div class="rl">@(_teacherName ?? "Beheerder")</div>
                 </div>
             </div>
             <a href="teacher" class="tl-side-logout">
@@ -65,6 +65,11 @@
                 <button class="x" @onclick="ClosePinModal"><TLIcon Name="close" Size="18" /></button>
             </div>
             <div class="tl-modal-body pin-modal-body">
+                <div class="tl-field">
+                    <label>Naam</label>
+                    <input type="text" class="tl-pin-input" placeholder="Jouw naam"
+                           @bind="_teacherNameInput" @bind:event="oninput" disabled="@_isSaving" />
+                </div>
                 <div class="tl-field">
                     <label>Huidige pincode</label>
                     <input type="password" class="tl-pin-input" placeholder="Huidige pincode"
@@ -113,14 +118,17 @@
     private string _currentPin = string.Empty;
     private string _newPin = string.Empty;
     private string _confirmPin = string.Empty;
+    private string? _teacherName;
+    private string _teacherNameInput = string.Empty;
     private string? _pinError;
     private bool _pinSuccess;
     private bool _isSaving;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         Nav.LocationChanged += OnLocationChanged;
         UpdatePageTitle(Nav.Uri);
+        _teacherName = await TeacherAuth.GetNameAsync();
     }
 
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
@@ -149,6 +157,7 @@
         _currentPin = string.Empty;
         _newPin = string.Empty;
         _confirmPin = string.Empty;
+        _teacherNameInput = _teacherName ?? string.Empty;
         _pinError = null;
         _pinSuccess = false;
         _pinModalOpen = true;
@@ -164,31 +173,42 @@
     {
         _pinError = null;
 
-        if (_newPin.Length < 4)
-        {
-            _pinError = "Pincode moet minimaal 4 tekens zijn.";
-            return;
-        }
+        var changingPin = !string.IsNullOrEmpty(_newPin);
 
-        if (_newPin != _confirmPin)
+        if (changingPin)
         {
-            _pinError = "Pincodes komen niet overeen.";
-            return;
+            if (_newPin.Length < 4)
+            {
+                _pinError = "Pincode moet minimaal 4 tekens zijn.";
+                return;
+            }
+
+            if (_newPin != _confirmPin)
+            {
+                _pinError = "Pincodes komen niet overeen.";
+                return;
+            }
         }
 
         _isSaving = true;
         StateHasChanged();
 
-        var success = await TeacherAuth.ChangePasswordAsync(_currentPin, _newPin);
+        if (!string.IsNullOrWhiteSpace(_teacherNameInput))
+            await TeacherAuth.SaveNameAsync(_teacherNameInput.Trim());
 
-        _isSaving = false;
-
-        if (!success)
+        if (changingPin)
         {
-            _pinError = "Huidige pincode is onjuist.";
-            return;
+            var success = await TeacherAuth.ChangePasswordAsync(_currentPin, _newPin);
+            if (!success)
+            {
+                _isSaving = false;
+                _pinError = "Huidige pincode is onjuist.";
+                return;
+            }
         }
 
+        _teacherName = string.IsNullOrWhiteSpace(_teacherNameInput) ? _teacherName : _teacherNameInput.Trim();
+        _isSaving = false;
         _pinSuccess = true;
         StateHasChanged();
 

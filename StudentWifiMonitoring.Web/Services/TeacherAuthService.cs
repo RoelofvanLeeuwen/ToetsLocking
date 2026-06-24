@@ -25,6 +25,9 @@ public class TeacherAuthService : ITeacherAuthService
     /// <summary>Sleutel waarmee de pincode in de AppSettings-tabel wordt opgeslagen.</summary>
     internal const string PasswordSettingKey = "Teacher:Password";
 
+    /// <summary>Sleutel waarmee de naam van de docent in de AppSettings-tabel wordt opgeslagen.</summary>
+    internal const string NameSettingKey = "Teacher:Name";
+
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly AppDbContext _db;
     private readonly IConfiguration _configuration;
@@ -63,6 +66,26 @@ public class TeacherAuthService : ITeacherAuthService
 
         await _db.SaveChangesAsync();
         return true;
+    }
+
+    /// <inheritdoc />
+    public async Task<string?> GetNameAsync()
+    {
+        return await _db.AppSettings
+            .Where(s => s.Key == NameSettingKey)
+            .Select(s => s.Value)
+            .FirstOrDefaultAsync();
+    }
+
+    /// <inheritdoc />
+    public async Task SaveNameAsync(string name)
+    {
+        var setting = await _db.AppSettings.FindAsync(NameSettingKey);
+        if (setting is null)
+            _db.AppSettings.Add(new AppSetting { Key = NameSettingKey, Value = name });
+        else
+            setting.Value = name;
+        await _db.SaveChangesAsync();
     }
 
     private async Task<string> GetActivePasswordAsync()
