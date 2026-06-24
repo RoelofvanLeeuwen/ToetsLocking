@@ -126,6 +126,11 @@ main {
     gap: 16px;
 }
 
+.tl-field-sep {
+    border-top: 1px solid var(--tl-line);
+    margin: 2px 0;
+}
+
 .tl-form-error {
     font-size: 13px;
     color: var(--tl-red, #e53e3e);

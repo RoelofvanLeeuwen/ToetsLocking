@@ -1,0 +1,79 @@
+@page "/wifi-display"
+@layout DisplayLayout
+@rendermode InteractiveServer
+@using StudentWifiMonitoring.Web.Services.Interfaces
+@inject IAccessPointSettingsService ApSettings
+@inject ITeacherAuthService TeacherAuth
+
+<PageTitle>WiFi-display — Toetslocker</PageTitle>
+
+@if (!_isTeacher)
+{
+    <div class="wd-auth">
+        <div class="wd-auth-card">
+            <h2>Toegang vereist</h2>
+            <p>Log in als docent om het WiFi-display te bekijken.</p>
+            <a href="/teacher" class="wd-auth-btn">Inloggen</a>
+        </div>
+    </div>
+}
+else
+{
+    <div class="wd-page">
+        <div class="wd-content">
+            @if (_isLoading)
+            {
+                <div class="wd-loading">Laden…</div>
+            }
+            else if (string.IsNullOrEmpty(_ssid))
+            {
+                <div class="wd-label">Netwerk niet ingesteld</div>
+                <div class="wd-not-configured">
+                    Voer de WiFi-netwerknaam in via de instellingen (avatar in de sidebar).
+                </div>
+            }
+            else
+            {
+                <div class="wd-label">Netwerknaam</div>
+                <div class="wd-ssid">@_ssid</div>
+
+                @if (_password is not null)
+                {
+                    <div class="wd-label wd-label-pwd">Wachtwoord</div>
+                    <div class="wd-password">@_password</div>
+                }
+                else
+                {
+                    <div class="wd-label wd-label-pwd">Open netwerk</div>
+                    <div class="wd-open">Geen wachtwoord vereist</div>
+                }
+            }
+        </div>
+
+        <div class="wd-footer">
+            <span class="wd-footer-brand">Toetslocker</span>
+            <button class="wd-refresh-btn" @onclick="RefreshAsync">Vernieuwen</button>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _isTeacher;
+    private bool _isLoading = true;
+    private string _ssid = string.Empty;
+    private string? _password;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isTeacher = TeacherAuth.IsTeacher();
+        if (_isTeacher)
+            await RefreshAsync();
+    }
+
+    private async Task RefreshAsync()
+    {
+        _isLoading = true;
+        (_ssid, _password) = await ApSettings.GetAsync();
+        _isLoading = false;
+    }
+}
