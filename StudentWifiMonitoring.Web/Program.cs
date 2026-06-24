@@ -120,6 +120,17 @@ builder.Services.AddScoped<IMyScreenService, MyScreenService>();
 
         app.MapHub<StatusHub>("/hubs/status");
 
+        // Expliciete downloadroute voor het PowerShell-script.
+        // UseStaticFiles serveert .ps1 niet standaard (geen MIME-type registratie).
+        // Results.File stuurt Content-Disposition: attachment mee zodat de browser altijd downloadt.
+        app.MapGet("/download/windows_ics.ps1", (IWebHostEnvironment env) =>
+        {
+            var path = Path.Combine(env.WebRootPath, "download", "windows_ics.ps1");
+            return File.Exists(path)
+                ? Results.File(path, "application/octet-stream", "windows_ics.ps1")
+                : Results.NotFound();
+        });
+
         // HTTP POST-endpoint voor docent-login.
         // Verwerkt de pincode vóór het verzenden van de response zodat het cookie correct gezet kan worden.
         app.MapPost("/api/teacher/login", (HttpContext httpContext, IConfiguration configuration) =>

@@ -1,0 +1,266 @@
+@page "/ics-instellen"
+@rendermode InteractiveServer
+@using StudentWifiMonitoring.Web.Services.Interfaces
+@inject ITeacherAuthService TeacherAuth
+@inject NavigationManager Nav
+
+<PageTitle>ICS instellen — Toetslocker</PageTitle>
+
+@if (!_isTeacher)
+{
+    <div class="tl-empty">
+        <div class="ic"><TLIcon Name="lock" Size="32" /></div>
+        <h3>Geen toegang</h3>
+        <p>Deze pagina is alleen beschikbaar voor docenten.</p>
+    </div>
+}
+else
+{
+    <div class="tl-ph">
+        <h1>ICS instellen</h1>
+        <p>Deel de internetverbinding van je Windows-pc met de Raspberry Pi via een Ethernet-kabel.</p>
+    </div>
+
+    <div class="ics-stack">
+
+        @* Download *@
+        <div class="tl-panel">
+            <div class="tl-panel-head">
+                <span class="tl-panel-title">PowerShell-script</span>
+            </div>
+            <div class="ics-download-body">
+                <p>
+                    Download het script en voer het uit als Administrator.<br />
+                    Het script detecteert automatisch de juiste netwerkadapters.
+                </p>
+                <button class="tl-btn tl-btn-brand" @onclick='() => Nav.NavigateTo("/download/windows_ics.ps1", forceLoad: true)'>
+                    <TLIcon Name="download" Size="16" />
+                    windows_ics.ps1 downloaden
+                </button>
+            </div>
+        </div>
+
+        @* Vereisten *@
+        <div class="tl-panel">
+            <div class="tl-panel-head">
+                <span class="tl-panel-title">Vereisten</span>
+            </div>
+            <div class="ics-body">
+                <div class="ics-table-wrap">
+                    <table class="tl-dtable ics-table">
+                        <thead>
+                            <tr>
+                                <th>Wat</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Twee netwerkadapters op de pc</td>
+                                <td>Eén met internet (bijv. Wi-Fi of LAN), één naar de Pi (bijv. USB-ethernet)</td>
+                            </tr>
+                            <tr>
+                                <td>Raspberry Pi verbonden via kabel</td>
+                                <td>USB-ethernetadapter of Thunderbolt-ethernet naar Pi</td>
+                            </tr>
+                            <tr>
+                                <td>PowerShell als <strong>Administrator</strong></td>
+                                <td>Zie Stap 1 hieronder</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        @* Stap 1 *@
+        <div class="tl-panel">
+            <div class="ics-step-head">
+                <span class="ics-step-num">1</span>
+                <span class="ics-step-title">PowerShell als Administrator openen</span>
+            </div>
+            <div class="ics-body">
+                <div>
+                    <p class="ics-sub">Optie A — Startmenu</p>
+                    <ol>
+                        <li>Druk op de <strong>Windows-toets</strong></li>
+                        <li>Typ <code class="ics-inline-code">PowerShell</code></li>
+                        <li>Klik met de <strong>rechtermuisknop</strong> op <em>Windows PowerShell</em></li>
+                        <li>Kies <strong>Als administrator uitvoeren</strong></li>
+                    </ol>
+                </div>
+                <div>
+                    <p class="ics-sub">Optie B — Rechtsklik op de taakbalk</p>
+                    <ol>
+                        <li>Rechtsklik op de <strong>Start-knop</strong></li>
+                        <li>Kies <strong>Windows PowerShell (Admin)</strong> of <strong>Terminal (Admin)</strong></li>
+                    </ol>
+                </div>
+                <div class="ics-note">
+                    Je ziet een UAC-bevestigingsvenster — klik op <strong>Ja</strong>.
+                </div>
+            </div>
+        </div>
+
+        @* Stap 2 *@
+        <div class="tl-panel">
+            <div class="ics-step-head">
+                <span class="ics-step-num">2</span>
+                <span class="ics-step-title">Script uitvoeren</span>
+            </div>
+            <div class="ics-body">
+                <p>Navigeer naar de map met het script en voer het uit:</p>
+                <pre><code class="ics-code">cd C:\Claude\pi-install
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\windows_ics.ps1</code></pre>
+                <div class="ics-note">
+                    <code class="ics-inline-code">Set-ExecutionPolicy</code> is alleen nodig als PowerShell scripts blokkeert. De instelling geldt alleen voor deze sessie.
+                </div>
+            </div>
+        </div>
+
+        @* Stap 3 *@
+        <div class="tl-panel">
+            <div class="ics-step-head">
+                <span class="ics-step-num">3</span>
+                <span class="ics-step-title">Adapters kiezen</span>
+            </div>
+            <div class="ics-body">
+                <p>Het script toont alle actieve netwerkadapters als genummerde lijst, bijvoorbeeld:</p>
+                <pre><code class="ics-code">Beschikbare actieve adapters:
+  [1] Ethernet          Realtek USB GbE Family Controller
+  [2] Wi-Fi             Intel(R) Wi-Fi 6 AX201
+
+Internet adapter (nummer) [Enter = Wi-Fi]:
+Pi adapter      (nummer) [Enter = Ethernet]:</code></pre>
+                <p>Het script detecteert automatisch:</p>
+                <ul>
+                    <li><strong>Internet adapter</strong> — de adapter met een actieve standaardroute (meestal Wi-Fi of schoolnetwerk-LAN)</li>
+                    <li><strong>Pi adapter</strong> — de overige actieve adapter (meestal de USB-ethernetadapter)</li>
+                </ul>
+                <p>Druk <strong>Enter</strong> als de suggestie klopt, of typ het nummer van de juiste adapter.</p>
+            </div>
+        </div>
+
+        @* Stap 4 *@
+        <div class="tl-panel">
+            <div class="ics-step-head">
+                <span class="ics-step-num">4</span>
+                <span class="ics-step-title">Bevestigen</span>
+            </div>
+            <div class="ics-body">
+                <p>Het script toont een samenvatting en vraagt om bevestiging:</p>
+                <pre><code class="ics-code">Configuratie:
+  Internet : Wi-Fi
+  Pi       : Ethernet
+
+Doorgaan? [J/n]:</code></pre>
+                <p>Typ <code class="ics-inline-code">j</code> en druk Enter.</p>
+            </div>
+        </div>
+
+        @* Resultaat *@
+        <div class="tl-panel">
+            <div class="tl-panel-head">
+                <span class="tl-panel-title">Resultaat</span>
+            </div>
+            <div class="ics-body">
+                <p>Na afloop zijn de volgende netwerkinstellingen actief:</p>
+                <div class="ics-table-wrap">
+                    <table class="tl-dtable ics-table">
+                        <thead>
+                            <tr>
+                                <th>Parameter</th>
+                                <th>Waarde</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Windows IP (Pi-adapter)</td>
+                                <td><code class="ics-inline-code">192.168.137.1</code></td>
+                            </tr>
+                            <tr>
+                                <td>Pi IP via DHCP</td>
+                                <td>automatisch, bijv. <code class="ics-inline-code">192.168.137.x</code></td>
+                            </tr>
+                            <tr>
+                                <td>Gateway op Pi</td>
+                                <td><code class="ics-inline-code">192.168.137.1</code></td>
+                            </tr>
+                            <tr>
+                                <td>DNS op Pi</td>
+                                <td><code class="ics-inline-code">192.168.137.1</code> of <code class="ics-inline-code">8.8.8.8</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Windows stelt automatisch een DHCP-server in op de Pi-adapter. De Pi krijgt normaal gesproken automatisch een IP-adres.</p>
+            </div>
+        </div>
+
+        @* SSH na ICS *@
+        <div class="tl-panel">
+            <div class="tl-panel-head">
+                <span class="tl-panel-title">Pi bereiken via SSH na ICS</span>
+            </div>
+            <div class="ics-body">
+                <p>De Pi krijgt via DHCP automatisch een IP in het bereik <code class="ics-inline-code">192.168.137.x</code>. Zoek het op met:</p>
+                <pre><code class="ics-code"># Op Windows — toont verbonden apparaten
+arp -a</code></pre>
+                <p>Verbind daarna via SSH:</p>
+                <pre><code class="ics-code">ssh mwieggers@192.168.137.x</code></pre>
+            </div>
+        </div>
+
+        @* Problemen *@
+        <div class="tl-panel">
+            <div class="tl-panel-head">
+                <span class="tl-panel-title">Veelvoorkomende problemen</span>
+            </div>
+            <div class="ics-body">
+                <div class="ics-table-wrap">
+                    <table class="tl-dtable ics-table">
+                        <thead>
+                            <tr>
+                                <th>Probleem</th>
+                                <th>Oplossing</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Script start niet</td>
+                                <td>PowerShell <strong>niet</strong> als administrator gestart — zie Stap 1</td>
+                            </tr>
+                            <tr>
+                                <td>Adapter niet gevonden</td>
+                                <td>Controleer of de USB-ethernetadapter herkend is (<em>Apparaatbeheer</em>) en de kabel in de Pi zit</td>
+                            </tr>
+                            <tr>
+                                <td>Pi krijgt geen IP</td>
+                                <td>Wacht 10–15 seconden na ICS-activatie; probeer daarna <code class="ics-inline-code">ipconfig /release</code> + <code class="ics-inline-code">ipconfig /renew</code> op Windows</td>
+                            </tr>
+                            <tr>
+                                <td>ICS werkt na herstart niet meer</td>
+                                <td>Windows schakelt ICS niet automatisch in na herstart — voer het script opnieuw uit</td>
+                            </tr>
+                            <tr>
+                                <td>Fout: "adapter niet gevonden in ICS"</td>
+                                <td>Start het script opnieuw; soms heeft Windows een moment nodig na het inpluggen van de adapter</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+}
+
+@code {
+    private bool _isTeacher;
+
+    protected override void OnInitialized()
+    {
+        _isTeacher = TeacherAuth.IsTeacher();
+    }
+}
