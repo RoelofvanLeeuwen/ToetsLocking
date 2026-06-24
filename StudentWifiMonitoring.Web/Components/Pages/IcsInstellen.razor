@@ -40,6 +40,16 @@ else
             </div>
         </div>
 
+        @* Sluit device aan *@
+        <div class="tl-panel">
+            <div class="tl-panel-head">
+                <span class="tl-panel-title">Sluit device aan</span>
+            </div>
+            <div class="ics-body">
+                <p>Zorg ervoor dat de kabel in de ethernetpoort van de laptop zit en in de Toetslocker device.</p>
+            </div>
+        </div>
+
         @* Vereisten *@
         <div class="tl-panel">
             <div class="tl-panel-head">
@@ -110,8 +120,7 @@ else
             </div>
             <div class="ics-body">
                 <p>Navigeer naar de map met het script en voer het uit:</p>
-                <pre><code class="ics-code">cd C:\Claude\pi-install
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+                <pre><code class="ics-code">Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\windows_ics.ps1</code></pre>
                 <div class="ics-note">
                     <code class="ics-inline-code">Set-ExecutionPolicy</code> is alleen nodig als PowerShell scripts blokkeert. De instelling geldt alleen voor deze sessie.
@@ -133,12 +142,9 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 Internet adapter (nummer) [Enter = Wi-Fi]:
 Pi adapter      (nummer) [Enter = Ethernet]:</code></pre>
-                <p>Het script detecteert automatisch:</p>
-                <ul>
-                    <li><strong>Internet adapter</strong> — de adapter met een actieve standaardroute (meestal Wi-Fi of schoolnetwerk-LAN)</li>
-                    <li><strong>Pi adapter</strong> — de overige actieve adapter (meestal de USB-ethernetadapter)</li>
-                </ul>
-                <p>Druk <strong>Enter</strong> als de suggestie klopt, of typ het nummer van de juiste adapter.</p>
+                <p>Het script detecteert automatisch.</p>
+                <p>Geef aan welke adapter jouw laptop gebruikt om naar internet te gaan (meestal wifi).</p>
+                <p>Geef bij de vraag 'Pi adapter' de netwerkkaart aan waar de kabel op is aangesloten (Ethernet).</p>
             </div>
         </div>
 
@@ -156,6 +162,7 @@ Pi adapter      (nummer) [Enter = Ethernet]:</code></pre>
 
 Doorgaan? [J/n]:</code></pre>
                 <p>Typ <code class="ics-inline-code">j</code> en druk Enter.</p>
+                <p>Wacht totdat de tekst verschijnt: ICS geconfigureerd</p>
             </div>
         </div>
 
@@ -181,7 +188,7 @@ Doorgaan? [J/n]:</code></pre>
                             </tr>
                             <tr>
                                 <td>Pi IP via DHCP</td>
-                                <td>automatisch, bijv. <code class="ics-inline-code">192.168.137.x</code></td>
+                                <td>automatisch</td>
                             </tr>
                             <tr>
                                 <td>Gateway op Pi</td>
