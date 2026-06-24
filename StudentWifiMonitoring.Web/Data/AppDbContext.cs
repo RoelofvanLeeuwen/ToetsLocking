@@ -12,9 +12,12 @@ public class AppDbContext : DbContext
     public DbSet<Connection> Connections => Set<Connection>();
     public DbSet<EventLog> Events => Set<EventLog>();
     public DbSet<TestSession> TestSessions => Set<TestSession>();
+    public DbSet<AppSetting> AppSettings => Set<AppSetting>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
+        b.Entity<AppSetting>().HasKey(s => s.Key);
+
         b.Entity<Student>().HasIndex(x => x.MacAddress).IsUnique();
         
         b.Entity<Connection>()

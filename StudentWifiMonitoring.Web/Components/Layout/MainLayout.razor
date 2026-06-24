@@ -1,5 +1,7 @@
+@using StudentWifiMonitoring.Web.Services.Interfaces
 @inherits LayoutComponentBase
 @inject NavigationManager Nav
+@inject ITeacherAuthService TeacherAuth
 @implements IDisposable
 
 <div class="tl-doc tl-root @(_menuOpen ? "menu-open" : "")">
@@ -17,7 +19,7 @@
         </nav>
         <div class="tl-side-foot">
             <div class="tl-side-user">
-                <div class="av">DO</div>
+                <div class="av tl-av-btn" @onclick="OpenPinModal" title="Pincode wijzigen">DO</div>
                 <div>
                     <div class="nm">Docent</div>
                     <div class="rl">Beheerder</div>
@@ -54,6 +56,49 @@
     </div>
 </div>
 
+@if (_pinModalOpen)
+{
+    <div class="tl-modal-scrim" @onclick="ClosePinModal">
+        <div class="tl-modal" @onclick:stopPropagation>
+            <div class="tl-modal-head">
+                <span class="t">Pincode wijzigen</span>
+                <button class="x" @onclick="ClosePinModal"><TLIcon Name="close" Size="18" /></button>
+            </div>
+            <div class="tl-modal-body pin-modal-body">
+                <div class="tl-field">
+                    <label>Huidige pincode</label>
+                    <input type="password" class="tl-pin-input" placeholder="Huidige pincode"
+                           @bind="_currentPin" @bind:event="oninput" disabled="@_isSaving" />
+                </div>
+                <div class="tl-field">
+                    <label>Nieuwe pincode</label>
+                    <input type="password" class="tl-pin-input" placeholder="Minimaal 4 tekens"
+                           @bind="_newPin" @bind:event="oninput" disabled="@_isSaving" />
+                </div>
+                <div class="tl-field">
+                    <label>Bevestig nieuwe pincode</label>
+                    <input type="password" class="tl-pin-input" placeholder="Herhaal nieuwe pincode"
+                           @bind="_confirmPin" @bind:event="oninput" disabled="@_isSaving" />
+                </div>
+                @if (_pinError is not null)
+                {
+                    <div class="tl-form-error">@_pinError</div>
+                }
+                @if (_pinSuccess)
+                {
+                    <div class="tl-form-success">Pincode gewijzigd.</div>
+                }
+            </div>
+            <div class="tl-modal-foot" style="gap: 10px;">
+                <button class="tl-btn tl-btn-ghost" @onclick="ClosePinModal" disabled="@_isSaving">Annuleren</button>
+                <button class="tl-btn tl-btn-brand" @onclick="SavePinAsync" disabled="@_isSaving">
+                    @(_isSaving ? "Opslaan…" : "Opslaan")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
 <div id="blazor-error-ui">
     Er is een onverwachte fout opgetreden.
     <a href="" class="reload">Herladen</a>
@@ -63,6 +108,14 @@
 @code {
     private bool _menuOpen;
     private string _pageTitle = "Dashboard";
+
+    private bool _pinModalOpen;
+    private string _currentPin = string.Empty;
+    private string _newPin = string.Empty;
+    private string _confirmPin = string.Empty;
+    private string? _pinError;
+    private bool _pinSuccess;
+    private bool _isSaving;
 
     protected override void OnInitialized()
     {
@@ -81,7 +134,8 @@
     {
         if (uri.Contains("/tests")) _pageTitle = "Toetsen";
         else if (uri.Contains("/export-by-test")) _pageTitle = "Export per toets";
-        else if (uri.Contains("/wifi")) _pageTitle = "Wifi-netwerk";
+        else if (uri.Contains("/wifi")) _pageTitle = "Netwerk";
+        else if (uri.Contains("/ics-instellen")) _pageTitle = "ICS instellen";
         else if (uri.Contains("/teacher")) _pageTitle = "Uitloggen";
         else if (uri.Contains("/dev/")) _pageTitle = "Dev";
         else _pageTitle = "Dashboard";
@@ -89,6 +143,59 @@
 
     private void ToggleMenu() => _menuOpen = !_menuOpen;
     private void CloseMenu() => _menuOpen = false;
+
+    private void OpenPinModal()
+    {
+        _currentPin = string.Empty;
+        _newPin = string.Empty;
+        _confirmPin = string.Empty;
+        _pinError = null;
+        _pinSuccess = false;
+        _pinModalOpen = true;
+    }
+
+    private void ClosePinModal()
+    {
+        if (_isSaving) return;
+        _pinModalOpen = false;
+    }
+
+    private async Task SavePinAsync()
+    {
+        _pinError = null;
+
+        if (_newPin.Length < 4)
+        {
+            _pinError = "Pincode moet minimaal 4 tekens zijn.";
+            return;
+        }
+
+        if (_newPin != _confirmPin)
+        {
+            _pinError = "Pincodes komen niet overeen.";
+            return;
+        }
+
+        _isSaving = true;
+        StateHasChanged();
+
+        var success = await TeacherAuth.ChangePasswordAsync(_currentPin, _newPin);
+
+        _isSaving = false;
+
+        if (!success)
+        {
+            _pinError = "Huidige pincode is onjuist.";
+            return;
+        }
+
+        _pinSuccess = true;
+        StateHasChanged();
+
+        await Task.Delay(1500);
+        _pinModalOpen = false;
+        _pinSuccess = false;
+    }
 
     public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
 }
