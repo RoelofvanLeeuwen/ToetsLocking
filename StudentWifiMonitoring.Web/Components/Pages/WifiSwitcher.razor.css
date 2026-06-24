@@ -45,6 +45,16 @@
     margin-left: auto;
 }
 
+/* Ethernet-statusregel — altijd op nieuwe regel, zelfde uitlijning als WiFi */
+.net-eth-row {
+    flex-basis: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-top: 1px solid var(--tl-line);
+    padding-top: 12px;
+}
+
 /* Waarschuwingsbanner */
 .wifi-warn {
     display: flex;

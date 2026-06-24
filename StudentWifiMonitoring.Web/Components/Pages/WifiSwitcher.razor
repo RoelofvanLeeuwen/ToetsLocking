@@ -6,7 +6,7 @@
 @inject ITeacherAuthService TeacherAuth
 @inject NavigationManager Nav
 
-<PageTitle>Wifi-netwerk — Toetslocker</PageTitle>
+<PageTitle>Netwerk — Toetslocker</PageTitle>
 
 @if (!_isTeacher)
 {
@@ -19,7 +19,7 @@
 else
 {
     <div class="tl-ph">
-        <h1>Wifi-netwerk</h1>
+        <h1>Netwerk</h1>
         <p>Selecteer het netwerk waarmee de Pi verbinding maakt.</p>
     </div>
 
@@ -59,6 +59,14 @@ else
             else
             {
                 <span class="tl-spill niet">Niet verbonden</span>
+            }
+            @if (_status?.EthernetIpAddress is not null)
+            {
+                <div class="net-eth-row">
+                    <span class="tl-spill verbonden">Verbonden</span>
+                    <span class="wifi-ssid">Ethernet</span>
+                    <span class="wifi-ip">@_status.EthernetIpAddress</span>
+                </div>
             }
         </div>
     </div>

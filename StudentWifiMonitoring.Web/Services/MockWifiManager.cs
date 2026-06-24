@@ -60,7 +60,7 @@ public class MockWifiManager : IWifiManager
         {
             var state = string.IsNullOrEmpty(_connectedSsid) ? WifiState.Disconnected : WifiState.Connected;
             var ip = state == WifiState.Connected ? "192.168.1.100" : null;
-            return Task.FromResult(new WifiStatus(_connectedSsid.NullIfEmpty(), ip, state));
+            return Task.FromResult(new WifiStatus(_connectedSsid.NullIfEmpty(), ip, state, "10.0.0.1"));
         }
     }
 }
