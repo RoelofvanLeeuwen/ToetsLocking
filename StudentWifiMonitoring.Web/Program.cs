@@ -133,12 +133,17 @@ builder.Services.AddScoped<IMyScreenService, MyScreenService>();
 
         // HTTP POST-endpoint voor docent-login.
         // Verwerkt de pincode vóór het verzenden van de response zodat het cookie correct gezet kan worden.
-        app.MapPost("/api/teacher/login", (HttpContext httpContext, IConfiguration configuration) =>
+        app.MapPost("/api/teacher/login", async (HttpContext httpContext, IConfiguration configuration, AppDbContext db) =>
         {
-            var configuredPassword = configuration["Teacher:Password"] ?? string.Empty;
+            var dbPassword = await db.AppSettings
+                .Where(s => s.Key == TeacherAuthService.PasswordSettingKey)
+                .Select(s => s.Value)
+                .FirstOrDefaultAsync();
+
+            var activePassword = dbPassword ?? configuration["Teacher:Password"] ?? string.Empty;
             var pin = httpContext.Request.Form["pin"].ToString();
 
-            if (!string.IsNullOrEmpty(configuredPassword) && pin == configuredPassword)
+            if (!string.IsNullOrEmpty(activePassword) && pin == activePassword)
             {
                 httpContext.Response.Cookies.Append(TeacherAuthService.CookieName, TeacherAuthService.CookieValue, new CookieOptions
                 {

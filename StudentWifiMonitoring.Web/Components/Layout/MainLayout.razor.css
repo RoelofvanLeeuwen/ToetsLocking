@@ -76,6 +76,72 @@ main {
     }
 }
 
+.tl-av-btn {
+    cursor: pointer;
+    transition: opacity .15s;
+}
+
+.tl-av-btn:hover {
+    opacity: .8;
+}
+
+.tl-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.tl-field label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--tl-muted);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.tl-pin-input {
+    padding: 10px 12px;
+    border: 1px solid var(--tl-line);
+    border-radius: 8px;
+    font-size: 15px;
+    background: var(--tl-surface);
+    color: var(--tl-ink);
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.tl-pin-input:focus {
+    outline: none;
+    border-color: var(--tl-brand);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--tl-brand) 15%, transparent);
+}
+
+.tl-pin-input:disabled {
+    opacity: .55;
+}
+
+.pin-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.tl-form-error {
+    font-size: 13px;
+    color: var(--tl-red, #e53e3e);
+    background: color-mix(in srgb, var(--tl-red, #e53e3e) 10%, transparent);
+    border-radius: 6px;
+    padding: 8px 12px;
+}
+
+.tl-form-success {
+    font-size: 13px;
+    color: var(--tl-green);
+    background: color-mix(in srgb, var(--tl-green) 10%, transparent);
+    border-radius: 6px;
+    padding: 8px 12px;
+}
+
 #blazor-error-ui {
     background: lightyellow;
     bottom: 0;
