@@ -12,14 +12,17 @@ namespace StudentWifiMonitoring.Web.Services;
 public class LinuxWifiManager : IWifiManager
 {
     private readonly string _iface;
+    private readonly string _ethIface;
     private readonly ILogger<LinuxWifiManager> _logger;
 
     // Splits op ':' maar niet op '\:' (nmcli terse-mode escaping)
     private static readonly Regex SplitColon = new(@"(?<!\\):", RegexOptions.Compiled);
+    private static readonly Regex EthernetIpPattern = new(@"inet\s+(\d+\.\d+\.\d+\.\d+)/", RegexOptions.Compiled);
 
     public LinuxWifiManager(IConfiguration cfg, ILogger<LinuxWifiManager> logger)
     {
         _iface = cfg["Wifi:Interface"] ?? "wlan0";
+        _ethIface = cfg["Network:EthernetInterface"] ?? "eth0";
         _logger = logger;
     }
 
@@ -154,7 +157,20 @@ public class LinuxWifiManager : IWifiManager
             }
         }
 
-        return new WifiStatus(connectedSsid, ip, state);
+        string? ethernetIp = null;
+        try
+        {
+            var ethOutput = await RunAsync("ip", ["-4", "addr", "show", _ethIface], ct);
+            var match = EthernetIpPattern.Match(ethOutput);
+            if (match.Success)
+                ethernetIp = match.Groups[1].Value;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Kon Ethernet-IP niet ophalen voor interface {Iface}", _ethIface);
+        }
+
+        return new WifiStatus(connectedSsid, ip, state, ethernetIp);
     }
 
     private static async Task<string> RunAsync(string fileName, string[] args, CancellationToken ct = default)

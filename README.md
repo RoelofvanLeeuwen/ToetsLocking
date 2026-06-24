@@ -185,6 +185,10 @@ Gebruik de README als startpunt en de documenten in `docs/` voor detailinformati
 - [Student registration flow](docs/flows/student-registration-flow.md)
 - [ADR: development fallback voor MAC-resolutie](docs/decisions/0001-mac-resolution-development-fallback.md)
 
+### Branchplannen
+
+- [feature/ip-info-en-powershell-helper](docs/plans/feature-ip-info-en-powershell-helper.md) — IP Ethernet-kaart tonen, PowerShell-script voor download, uitlegpagina voor docenten
+
 ## Repository-opmerking
 
 De repository bevat ook oudere projectresten zoals `ToetsLockingWifiMonitoring.Web` en een ouder `docker-compose.yml`. Voor de huidige applicatie en deployment moet je uitgaan van:
