@@ -644,6 +644,20 @@ Het beoogde deploymentmodel is Docker op Raspberry Pi met:
 
 Lokaal op Windows ligt de nadruk op functionele flowtests, niet op realistische netwerkmonitoring.
 
+### CI/CD: Docker image publicatie
+
+Bij elke versietag op `main` (patroon `v[0-9]+.[0-9]+.[0-9]+`) voert een GitHub Actions workflow de volgende stappen uit:
+
+1. QEMU opzetten voor `linux/arm64` cross-compilatie
+2. Docker Buildx configureren
+3. Authenticeren bij `ghcr.io` via `GITHUB_TOKEN`
+4. Image bouwen vanuit de `Dockerfile` in de root
+5. Image publiceren onder twee tags: versienummer (zonder `v`) en `latest`
+
+De image wordt gepubliceerd als privaat pakket op `ghcr.io/roelofvanleeuwen/gctoetslocking`. Ophalen vereist een GitHub PAT met scope `read:packages`.
+
+De workflow staat in `.github/workflows/docker-publish.yml`.
+
 ## Bekende beperkingen
 
 - geen ASP.NET Identity of gebruikersdatabase

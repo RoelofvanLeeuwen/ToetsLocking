@@ -151,6 +151,58 @@ Belangrijk:
 - persistente opslag loopt via een Docker volume
 - `Teacher__Password` moet aangepast worden voor productie
 
+## Releases en gepubliceerde images
+
+Bij elke versietag op `main` wordt automatisch een Docker image gebouwd en gepubliceerd via GitHub Actions.
+
+### Trigger
+
+Push een tag in het formaat `vMAJOR.MINOR.PATCH` op de `main`-branch:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+### Gepubliceerde images
+
+De workflow publiceert twee tags tegelijk naar `ghcr.io`:
+
+| Tag | Beschrijving |
+|-----|-------------|
+| `ghcr.io/roelofvanleeuwen/gctoetslocking:1.0.0` | Versiespecifieke tag (zonder `v`-prefix) |
+| `ghcr.io/roelofvanleeuwen/gctoetslocking:latest` | Altijd de laatste gepubliceerde versie |
+
+De image is gebouwd voor `linux/arm64` (Raspberry Pi).
+
+### Zichtbaarheid en authenticatie
+
+De image is privaat. Ophalen vereist authenticatie met een geldig GitHub Personal Access Token (PAT) met minimaal de scope `read:packages`.
+
+Inloggen op de server voordat je de image pullt:
+
+```bash
+echo <PAT> | docker login ghcr.io -u <github-gebruikersnaam> --password-stdin
+```
+
+Daarna pullen:
+
+```bash
+docker pull ghcr.io/roelofvanleeuwen/gctoetslocking:latest
+```
+
+### Image gebruiken op de Raspberry Pi
+
+Vervang de lokale build in `docker-compose.pi.yml` door de gepubliceerde image:
+
+```yaml
+services:
+  app:
+    image: ghcr.io/roelofvanleeuwen/gctoetslocking:1.0.0
+```
+
+Zorg dat Docker op de Pi is ingelogd bij `ghcr.io` (zie authenticatie hierboven) voordat je `docker compose up` uitvoert.
+
 ## Huidige status en aandachtspunten
 
 De UI-refactor is grotendeels afgerond:
@@ -188,6 +240,7 @@ Gebruik de README als startpunt en de documenten in `docs/` voor detailinformati
 ### Branchplannen
 
 - [feature/ip-info-en-powershell-helper](docs/plans/feature-ip-info-en-powershell-helper.md) — IP Ethernet-kaart tonen, PowerShell-script voor download, uitlegpagina voor docenten
+- [feature/docker-publish-ghcr](docs/plans/feature-docker-publish-ghcr.md) — GitHub Actions workflow voor automatische Docker image publicatie op ghcr.io bij versietag
 
 ## Repository-opmerking
 
