@@ -10,7 +10,7 @@
 
 ## Acceptatiecriteria
 
-1. **Trigger** — De workflow start uitsluitend wanneer een tag wordt gepusht die voldoet aan het patroon `v[0-9]+.[0-9]+.[0-9]+` (bijv. `v1.0.0`, `v2.3.1`).
+1. **Trigger** — De workflow start uitsluitend wanneer een tag wordt gepusht in het formaat `vMAJOR.MINOR.PATCH` (bijv. `v1.0.0`, `v2.3.1`).
 
 2. **Twee tags gepubliceerd** — De workflow publiceert de image onder twee tags tegelijk:
    - `ghcr.io/roelofvanleeuwen/gctoetslocking:latest`
