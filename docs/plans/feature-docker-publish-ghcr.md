@@ -5,7 +5,7 @@
 ## Story
 
 **Als** ontwikkelaar  
-**Wil ik** dat er automatisch een Docker image wordt gebouwd en gepubliceerd op `ghcr.io` wanneer ik een tag in het formaat `v1.0.0` op de `main`-branch zet  
+**Wil ik** dat er automatisch een Docker image wordt gebouwd en gepubliceerd op `ghcr.io` wanneer ik een tag in het formaat `v1.0.0` op de `master`-branch zet  
 **Zodat** ik de image vanaf een andere server kan pullen zonder handmatig te hoeven bouwen of overdragen
 
 ## Acceptatiecriteria
