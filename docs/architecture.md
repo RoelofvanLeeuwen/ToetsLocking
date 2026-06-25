@@ -646,7 +646,7 @@ Lokaal op Windows ligt de nadruk op functionele flowtests, niet op realistische 
 
 ### CI/CD: Docker image publicatie
 
-Bij elke versietag op `main` (patroon `v[0-9]+.[0-9]+.[0-9]+`) voert een GitHub Actions workflow de volgende stappen uit:
+Bij elke versietag op `main` (formaat `vMAJOR.MINOR.PATCH`) voert een GitHub Actions workflow de volgende stappen uit:
 
 1. QEMU opzetten voor `linux/arm64` cross-compilatie
 2. Docker Buildx configureren
