@@ -89,7 +89,10 @@ Teacher__Password=<pincode>
 ForceHttps=false
 ASPNETCORE_ENVIRONMENT=Production
 ASPNETCORE_URLS=http://+:5000
+APP_VERSION=1.0.0
 ```
+
+`APP_VERSION` wordt automatisch ingesteld door de Docker-buildpipeline via een build-argument. Je hoeft dit niet handmatig te zetten; de waarde komt overeen met de versietag waarmee het image is gebouwd.
 
 Belangrijke deploymentafspraken:
 
@@ -174,6 +177,8 @@ De workflow publiceert twee tags tegelijk naar `ghcr.io`:
 | `ghcr.io/roelofvanleeuwen/gctoetslocking:latest` | Altijd de laatste gepubliceerde versie |
 
 De image is gebouwd voor `linux/arm64` (Raspberry Pi).
+
+De versietag is ook zichtbaar in de portal: onderin de sidebar toont de applicatie automatisch het versienummer dat overeenkomt met de Docker image-tag.
 
 ### Zichtbaarheid en authenticatie
 

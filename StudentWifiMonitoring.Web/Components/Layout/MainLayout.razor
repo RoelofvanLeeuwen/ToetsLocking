@@ -3,6 +3,7 @@
 @inject NavigationManager Nav
 @inject ITeacherAuthService TeacherAuth
 @inject IAccessPointSettingsService ApSettings
+@inject IAppVersionService AppVersion
 @implements IDisposable
 
 <div class="tl-doc tl-root @(_menuOpen ? "menu-open" : "")">
@@ -30,6 +31,7 @@
                 <TLIcon Name="logout" Size="16" />
                 Uitloggen
             </a>
+            <div class="tl-version">v@AppVersion.Version</div>
         </div>
     </aside>
 
