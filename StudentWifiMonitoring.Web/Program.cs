@@ -33,6 +33,7 @@ builder.Services.AddScoped<IMyScreenService, MyScreenService>();
         builder.Services.AddScoped<IDevStationsService, DevStationsService>();
         builder.Services.AddScoped<ITeacherAuthService, TeacherAuthService>();
         builder.Services.AddScoped<IAccessPointSettingsService, AccessPointSettingsService>();
+        builder.Services.AddSingleton<IAppVersionService, AppVersionService>();
 
         builder.Services.AddSignalR();
         builder.Services.AddHostedService<MonitoringService>();

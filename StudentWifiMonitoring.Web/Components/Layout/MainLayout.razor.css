@@ -147,6 +147,12 @@ main {
     padding: 8px 12px;
 }
 
+.tl-version {
+    font-size: 0.7rem;
+    opacity: 0.45;
+    padding: 2px 12px 8px;
+}
+
 #blazor-error-ui {
     background: lightyellow;
     bottom: 0;

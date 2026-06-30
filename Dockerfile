@@ -24,6 +24,9 @@ RUN dotnet publish StudentWifiMonitoring.Web.csproj \
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
+
 # Installeer Linux-tools die nodig zijn voor netwerkmonitoring:
 # - iw: uitlezen van wifi-stations (iw dev wlan0 station dump)
 # - iproute2: ip/arp-commando's voor MAC-adres resolutie
