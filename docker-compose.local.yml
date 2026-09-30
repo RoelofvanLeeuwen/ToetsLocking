@@ -17,15 +17,16 @@ services:
     restart: unless-stopped
 
     ports:
-      # App bereikbaar via http://localhost:5000
-      - "5000:5000"
+      # App bereikbaar via http://localhost:80 en https://localhost:443
+      - "80:80"
+      - "443:443"
 
     environment:
       # ASP.NET Core omgeving
       - ASPNETCORE_ENVIRONMENT=Production
 
-      # HTTP-only — luister op poort 5000
-      - ASPNETCORE_URLS=http://+:5000
+      # Luister op HTTP (poort 80) en HTTPS (poort 443)
+      - ASPNETCORE_URLS=http://+:80;https://+:443
 
       # SQLite-database in het gemounte volume
       - ConnectionStrings__Default=Data Source=/data/app.db
@@ -37,12 +38,20 @@ services:
       # Docent-wachtwoord — alleen voor lokaal testen
       - Teacher__Password=1234
 
-      # Voorkom HTTPS-redirects
+      # TLS-certificaat voor lokaal testen — verwijder commentaar en vul paden in
+      # om HTTPS lokaal te testen. Zonder deze variabelen start de app alleen op HTTP.
+      # - KESTREL__CERTIFICATES__DEFAULT__PATH=/certs/cert.pfx
+      # - KESTREL__CERTIFICATES__DEFAULT__PASSWORD=wachtwoord
+
+      # Zet op true als je lokaal ook HTTPS-redirects wil testen
       - ForceHttps=false
 
     volumes:
       # Persistente opslag voor de SQLite-database
       - toetslocking-local-data:/data
+
+      # TLS-certificaat voor lokaal testen — verwijder commentaar en pas pad aan
+      # - C:\certs\toetslocking:/certs:ro
 
 volumes:
   toetslocking-local-data:

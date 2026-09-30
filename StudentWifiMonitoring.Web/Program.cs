@@ -147,12 +147,13 @@ builder.Services.AddScoped<IMyScreenService, MyScreenService>();
 
             if (!string.IsNullOrEmpty(activePassword) && pin == activePassword)
             {
+                var forceHttps = app.Configuration.GetValue<bool>("ForceHttps");
                 httpContext.Response.Cookies.Append(TeacherAuthService.CookieName, TeacherAuthService.CookieValue, new CookieOptions
                 {
                     HttpOnly = true,
                     IsEssential = true,
                     SameSite = SameSiteMode.Strict,
-                    Secure = false // Zet op true als alleen HTTPS gewenst is
+                    Secure = forceHttps
                 });
                 return Results.Redirect("/teacher");
             }

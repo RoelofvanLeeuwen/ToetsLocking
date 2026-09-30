@@ -25,8 +25,8 @@ services:
       # ASP.NET Core omgeving
       - ASPNETCORE_ENVIRONMENT=Production
 
-      # HTTP-only op de Pi — luister op poort 5000
-      - ASPNETCORE_URLS=http://+:5000
+      # Luister op HTTP (poort 80) en HTTPS (poort 443)
+      - ASPNETCORE_URLS=http://+:80;https://+:443
 
       # SQLite-database in het gemounte volume
       - ConnectionStrings__Default=Data Source=/data/app.db
@@ -38,15 +38,20 @@ services:
       # Docent-wachtwoord — wijzig dit vóór productiegebruik
       - Teacher__Password=vervang-dit
 
-      # Voorkom HTTPS-redirects (geen TLS op de Pi in deze setup)
-      # LET OP: app.UseHttpsRedirection() in Program.cs moet uitgeschakeld
-      # worden (of conditioneel gemaakt) zodat dit ook daadwerkelijk werkt.
-      # Zie README voor instructies.
-      - ASPNETCORE_FORWARDEDHEADERS_ENABLED=false
+      # TLS-certificaat — plaats cert.pfx op de Pi in /etc/toetslocking/certs/
+      # en vul het wachtwoord van het PFX-bestand in
+      - KESTREL__CERTIFICATES__DEFAULT__PATH=/certs/cert.pfx
+      - KESTREL__CERTIFICATES__DEFAULT__PASSWORD=vervang-dit
+
+      # Zet op true om HTTP-verkeer automatisch door te sturen naar HTTPS
+      - ForceHttps=true
 
     volumes:
       # Persistente opslag voor de SQLite-database
       - toetslocking-data:/data
+
+      # TLS-certificaat buiten de container — map op de Pi bevat cert.pfx
+      - /etc/toetslocking/certs:/certs:ro
 
     # Optioneel: geef de container toegang tot het netwerk voor raw-socket
     # operaties als dat later nodig blijkt

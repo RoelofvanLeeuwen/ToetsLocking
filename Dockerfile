@@ -43,10 +43,14 @@ RUN apt-get update && \
 # Map voor de SQLite-database (wordt gemount als volume vanuit docker-compose)
 RUN mkdir -p /data
 
+# Map voor het TLS-certificaat (wordt gemount als volume vanuit docker-compose)
+RUN mkdir -p /certs
+
 # Kopieer de gepubliceerde bestanden vanuit de build stage
 COPY --from=build /app/publish .
 
-# Standaard HTTP-poort (geen HTTPS op de Pi)
-EXPOSE 5000
+# HTTP en HTTPS poorten
+EXPOSE 80
+EXPOSE 443
 
 ENTRYPOINT ["dotnet", "StudentWifiMonitoring.Web.dll"]
