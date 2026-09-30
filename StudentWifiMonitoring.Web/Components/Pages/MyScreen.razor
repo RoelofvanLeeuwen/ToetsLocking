@@ -1,6 +1,8 @@
 @page "/myscreen"
 @layout StudentLayout
 @using Microsoft.AspNetCore.SignalR.Client
+@using Microsoft.AspNetCore.Hosting.Server
+@using Microsoft.AspNetCore.Hosting.Server.Features
 @using StudentWifiMonitoring.Web.DTOs.MyScreen
 @using StudentWifiMonitoring.Web.Services
 @using StudentWifiMonitoring.Web.Services.Interfaces
@@ -10,6 +12,7 @@
 @inject IHttpContextAccessor HttpContextAccessor
 @inject NavigationManager Nav
 @inject IWebHostEnvironment Environment
+@inject IServer Server
 @inject StudentWifiMonitoring.Web.Services.StudentNavStateService NavState
 @implements IAsyncDisposable
 
@@ -241,12 +244,32 @@ else
     {
         try
         {
-            // Blazor Server: componentcode draait server-side. Nav.ToAbsoluteUri() geeft
-            // de externe hostnaam (bijv. toetslocker.lan) die de server niet zelf kan resolven.
-            // Gebruik localhost met de poort uit de browser-URL zodat de server zichzelf bereikt.
-            var port = new Uri(Nav.BaseUri).Port;
+            // Blazor Server draait server-side: gebruik het interne Kestrel-adres zodat
+            // de verbinding werkt ongeacht reverse proxy of extern hostname.
+            var addresses = Server.Features.Get<IServerAddressesFeature>()?.Addresses ?? [];
+            var raw = addresses.FirstOrDefault(a => a.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+                      ?? addresses.FirstOrDefault()
+                      ?? "http://localhost:80";
+            raw = raw.Replace("://*:", "://localhost:", StringComparison.OrdinalIgnoreCase)
+                     .Replace("://0.0.0.0:", "://localhost:", StringComparison.OrdinalIgnoreCase)
+                     .Replace("://[::]:", "://localhost:", StringComparison.OrdinalIgnoreCase);
+            var hubUri = new Uri(raw);
+            var hubUrl = $"{hubUri.Scheme}://{hubUri.Host}:{hubUri.Port}/hubs/status";
+
             _hubConnection = new HubConnectionBuilder()
-                .WithUrl($"http://localhost:{port}/hubs/status")
+                .WithUrl(hubUrl, options =>
+                {
+                    if (hubUri.Scheme == "https")
+                    {
+                        options.HttpMessageHandlerFactory = handler =>
+                        {
+                            if (handler is HttpClientHandler h)
+                                h.ServerCertificateCustomValidationCallback =
+                                    HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+                            return handler;
+                        };
+                    }
+                })
                 .WithAutomaticReconnect()
                 .Build();
 
