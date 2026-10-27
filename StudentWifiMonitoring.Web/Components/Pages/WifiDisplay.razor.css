@@ -37,6 +37,19 @@
     margin-top: 64px;
 }
 
+.wd-label-website {
+    margin-top: 64px;
+}
+
+.wd-website {
+    font-size: 3.5rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    line-height: 1.1;
+    color: #7EC8F4;
+    word-break: break-all;
+}
+
 .wd-ssid {
     font-size: 6rem;
     font-weight: 800;
